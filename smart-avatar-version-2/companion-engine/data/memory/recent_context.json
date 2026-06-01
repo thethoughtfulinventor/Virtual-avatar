@@ -5,10 +5,6 @@
     },
     {
         "role": "user",
-        "content": "traits"
-    },
-    {
-        "role": "user",
-        "content": "goals"
+        "content": "hello"
     }
 ]

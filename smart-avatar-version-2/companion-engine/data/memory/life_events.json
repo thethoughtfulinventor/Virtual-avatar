@@ -14,5 +14,13 @@
     {
         "timestamp": "2026-05-31T17:05:12.752013",
         "description": "Started Phase 3"
+    },
+    {
+        "timestamp": "2026-05-31T19:24:32.770625",
+        "description": "Finished phase 3 and switched to claud for aid over chatgpt"
+    },
+    {
+        "timestamp": "2026-05-31T19:31:32.846619",
+        "description": "Started Phase 4"
     }
 ]

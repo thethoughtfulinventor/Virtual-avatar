@@ -100,13 +100,16 @@ class MemoryManager:
     def add_context(
         self,
         role,
-        content
+        content,
+        character=None
     ):
-
+ 
         self.recent_context.add(
             role,
-            content
+            content,
+            character
         )
+ 
 
 
     def get_recent_context(
