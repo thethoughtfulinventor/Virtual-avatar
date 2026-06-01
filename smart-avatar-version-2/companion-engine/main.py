@@ -99,111 +99,83 @@ def on_engine_started(data):
 
 def on_user_input(text):
 
-    memory = service_manager.get(
-        "memory"
-    )
+    memory = service_manager.get("memory")
 
-    result = brain_instance.process(
-        text
-    )
+    result = brain_instance.process(text)
 
     intent = result["intent"]
 
-    print(
-        f"[INTENT] {intent}"
-    )
+    print(f"[INTENT] {intent}")
 
     print(
-        f"{brain_instance.character_manager.get_name()}: {result['response']}"
+        f"{brain_instance.character_manager.get_name()}"
+        f": {result['response']}"
     )
 
-    # User profile memory
+    # --- System command routing ---
+    # Brain has already generated a response and
+    # stored context. These blocks handle the actual
+    # memory operations the commands imply.
 
     if intent == "memory_store":
 
         try:
 
             key_value = text.replace(
-                "remember ",
-                ""
+                "remember ", ""
             )
 
-            key, value = key_value.split(
-                "=",
-                1
-            )
+            key, value = key_value.split("=", 1)
 
             memory.remember(
                 key.strip(),
                 value.strip()
             )
 
-            print(
-                f"Stored: {key.strip()}"
-            )
+            print(f"Stored: {key.strip()}")
 
         except ValueError:
 
-            print(
-                "Usage: remember key=value"
-            )
+            print("Usage: remember key=value")
 
         return
 
     if intent == "memory_recall":
 
         key = text.replace(
-            "recall ",
-            ""
+            "recall ", ""
         ).strip()
 
         value = memory.recall(key)
 
-        print(
-            f"Memory: {value}"
-        )
+        print(f"Memory: {value}")
 
         return
-
-    # Project memory
 
     if intent == "project_create":
 
         project_name = text.replace(
-            "create project ",
-            ""
+            "create project ", ""
         ).strip()
 
-        memory.create_project(
-            project_name
-        )
+        memory.create_project(project_name)
 
-        print(
-            f"Created project: {project_name}"
-        )
+        print(f"Created project: {project_name}")
 
         return
 
     if intent == "project_lookup":
 
         project_name = text.replace(
-            "project ",
-            ""
+            "project ", ""
         ).strip()
 
-        project = memory.get_project(
-            project_name
-        )
+        project = memory.get_project(project_name)
 
         if project:
-
             print(project)
-
         else:
-
-            print(
-                "Project not found"
-            )
+            print("Project not found")
 
         return
 
@@ -212,60 +184,41 @@ def on_user_input(text):
         projects = memory.list_projects()
 
         if projects:
-
             print(projects)
-
         else:
-
-            print(
-                "No projects found"
-            )
+            print("No projects found")
 
         return
-
-    # Episodic memory
 
     if intent == "episode_create":
 
         summary = text.replace(
-            "episode ",
-            ""
+            "episode ", ""
         ).strip()
 
         memory.add_episode(summary)
 
-        print(
-            "Episode stored."
-        )
+        print("Episode stored.")
 
         return
 
     if intent == "episode_list":
 
-        episodes = (
-            memory.get_recent_episodes()
-        )
+        episodes = memory.get_recent_episodes()
 
         for episode in episodes:
-
             print(
                 f"{episode['timestamp']} "
-                f"- "
-                f"{episode['summary']}"
+                f"- {episode['summary']}"
             )
 
         return
 
-    # Recent context
-
     if intent == "context_view":
 
-        entries = (
-            memory.get_recent_context()
-        )
+        entries = memory.get_recent_context()
 
         for entry in entries:
-
             print(
                 f"[{entry['role']}] "
                 f"{entry['content']}"
@@ -277,43 +230,30 @@ def on_user_input(text):
 
         memory.recent_context.clear()
 
-        print(
-            "Context cleared."
-        )
+        print("Context cleared.")
 
         return
-
-    # Life events
 
     if intent == "life_event_create":
 
         description = text.replace(
-            "life event ",
-            ""
+            "life event ", ""
         ).strip()
 
-        memory.add_life_event(
-            description
-        )
+        memory.add_life_event(description)
 
-        print(
-            "Life event stored."
-        )
+        print("Life event stored.")
 
         return
 
     if intent == "life_events_list":
 
-        events = (
-            memory.get_life_events()
-        )
+        events = memory.get_life_events()
 
         for event in events:
-
             print(
                 f"{event['timestamp']} "
-                f"- "
-                f"{event['description']}"
+                f"- {event['description']}"
             )
 
         return
@@ -332,30 +272,17 @@ def on_user_input(text):
             .get_dominant()
         )
 
-        print(
-            f"Dominant state: {dominant}"
-        )
+        print(f"Dominant state: {dominant}")
 
         for key, value in state.items():
-
-            print(
-                f"  {key}: {value:.2f}"
-            )
+            print(f"  {key}: {value:.2f}")
 
         return
 
     # Default: conversation
-
-    print(
-        f"[EVENT] user_input: {text}"
-    )
-
-    memory.add_context(
-        "user",
-        text
-    )
-
-    memory.compress_context()
+    # Context is stored inside brain.process().
+    # Nothing extra needed here.
+    print(f"[EVENT] user_input: {text}")
 
 
 def main():
@@ -363,8 +290,6 @@ def main():
     print("=" * 40)
     print("AIYA CORE ENGINE")
     print("=" * 40)
-
-    # Core systems
 
     state_manager = StateManager()
 
@@ -376,8 +301,6 @@ def main():
 
     plugin_manager = PluginManager()
 
-    # Memory
-
     memory_manager = MemoryManager()
 
     service_manager.register(
@@ -386,8 +309,7 @@ def main():
     )
 
     context_count = len(
-        memory_manager
-        .get_recent_context(100)
+        memory_manager.get_recent_context(100)
     )
 
     print(
@@ -395,8 +317,6 @@ def main():
         f"{context_count} "
         f"context entries."
     )
-
-    # Events
 
     event_bus.subscribe(
         "engine_started",
@@ -407,8 +327,6 @@ def main():
         "user_input",
         on_user_input
     )
-
-    # Character loading
 
     character_loader = CharacterLoader()
 
@@ -423,11 +341,7 @@ def main():
         character
     )
 
-    print(
-        f"Loaded Character: {character['name']}"
-    )
-
-    # Brain
+    print(f"Loaded Character: {character['name']}")
 
     brain = Brain(
         state_manager,
@@ -441,30 +355,18 @@ def main():
 
     print("Core systems initialized")
 
-    # Startup event
-
-    event_bus.emit(
-        "engine_started"
-    )
+    event_bus.emit("engine_started")
 
     print("Engine running")
-
-    # Main loop
 
     while True:
 
         command = input("> ")
 
-        if command.lower() in [
-            "quit",
-            "exit"
-        ]:
+        if command.lower() in ["quit", "exit"]:
             break
 
-        event_bus.emit(
-            "user_input",
-            command
-        )
+        event_bus.emit("user_input", command)
 
 
 if __name__ == "__main__":

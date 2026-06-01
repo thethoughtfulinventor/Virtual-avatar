@@ -114,7 +114,7 @@ class MemoryManager:
 
     def get_recent_context(
         self,
-        count=10
+        count=50
     ):
 
         return (
@@ -122,25 +122,25 @@ class MemoryManager:
             .get_recent(count)
         )
 
-    def compress_context(self):
+    # New — accepts a pre-generated summary,
+    # returns the entries if compression ran
+    def compress_context(self, summary=None):
 
-        entries = self.recent_context.get_recent(5)
+        entries = self.recent_context.get_recent(25)
 
-        if len(entries) < 5:
-            return
+        if len(entries) < 25:
+            return None
 
-        summary = (
-            f"Conversation contained "
-            f"{len(entries)} messages."
-        )
-
-        self.add_episode(summary)
+        if summary:
+            self.add_episode(summary)
 
         self.recent_context.entries = (
-            self.recent_context.entries[-2:]
+            self.recent_context.entries[-3:]
         )
 
         self.recent_context.save()
+
+        return entries
     
     def add_life_event(
         self,

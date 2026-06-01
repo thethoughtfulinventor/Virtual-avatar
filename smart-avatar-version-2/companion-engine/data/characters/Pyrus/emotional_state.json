@@ -1,10 +1,10 @@
 {
     "state": {
         "mood": 0.6,
-        "energy": 0.78,
-        "engagement": 0.6,
-        "patience": 0.8,
+        "energy": 0.37999999999999945,
+        "engagement": 1.0,
+        "patience": 0.94,
         "curiosity": 0.6
     },
-    "last_saved": "2026-06-01T10:55:44.629547"
+    "last_saved": "2026-06-01T17:45:20.708467"
 }

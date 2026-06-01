@@ -1,34 +1,79 @@
 import requests
 
-class OllamaClient:
-    def __init__(self, model="llama3"):
-        self.model = model
-        self.url = "http://localhost:11434/api/generate"
+from llm.model_config import ModelConfig
 
-    def generate(self, prompt):
-        print("\n[LLM] Sending prompt:")
-        print(prompt)
+
+class OllamaClient:
+
+    def __init__(self, model=None):
+
+        self.model = (
+            model or ModelConfig.MODEL
+        )
+
+        self.url = ModelConfig.URL
+
+        self.timeout = ModelConfig.TIMEOUT
+
+    def chat(
+        self,
+        system_prompt,
+        messages
+    ):
+        """
+        Send a chat request to Ollama.
+
+        system_prompt: str
+            Full character and context prompt.
+
+        messages: list of dicts
+            [{"role": "user"/"assistant",
+              "content": str}, ...]
+
+        Returns the model's reply as a string,
+        or an empty string on failure.
+        """
 
         payload = {
             "model": self.model,
-            "prompt": prompt,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": system_prompt
+                },
+                *messages
+            ],
             "stream": False
         }
 
         try:
-            response = requests.post(self.url, json=payload, timeout=60)
+
+            response = requests.post(
+                self.url,
+                json=payload,
+                timeout=self.timeout
+            )
+
         except Exception as e:
-            print("[LLM] Request failed:", e)
+
+            print(f"[LLM] Connection error: {e}")
+
             return ""
 
-        print("[LLM] Status:", response.status_code)
-
         if response.status_code != 200:
-            print("[LLM] Error response:", response.text)
+
+            print(
+                f"[LLM] Error {response.status_code}: "
+                f"{response.text}"
+            )
+
             return ""
 
         data = response.json()
 
-        print("[LLM] Raw response:", data)
-
-        return data.get("response", "")
+        return (
+            data
+            .get("message", {})
+            .get("content", "")
+            .strip()
+        )
