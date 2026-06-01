@@ -1,0 +1,289 @@
+# AIYA DEVELOPMENT ROADMAP
+
+PHASE 0 — VISION AND REQUIREMENTS
+=================================
+Goal:
+- Define what Aiya is and is not.
+- Establish architecture boundaries.
+- Define character, memory, avatar, and tool systems.
+
+Deliverables:
+- Vision document
+- System architecture document
+- Character specification
+- Development roadmap
+
+Success Criteria:
+- All major systems are defined before implementation.
+
+--------------------------------------------------
+
+PHASE 1 — CORE COMPANION ENGINE
+===============================
+Goal:
+- Build the non-LLM foundation.
+
+Components:
+- Event system
+- State manager
+- Configuration system
+- Character loader
+- Plugin architecture
+
+Deliverables:
+- Companion engine runtime
+- Service manager
+- Character package loading
+
+Success Criteria:
+- Engine starts and runs without an LLM attached.
+
+--------------------------------------------------
+
+PHASE 2 — MEMORY SYSTEM
+=======================
+Goal:
+- Create persistent memory.
+
+Memory Layers:
+1. User Profile
+2. Recent Context
+3. Episodic Memory
+4. Active Projects
+5. Life Events
+
+Features:
+- Memory retrieval
+- Memory creation
+- Compression
+- Summarization
+
+Success Criteria:
+- Aiya remembers information across sessions.
+
+--------------------------------------------------
+
+PHASE 3 — CHARACTER SYSTEM
+==========================
+Goal:
+- Separate personality from the engine.
+
+Components:
+- Personality definitions
+- Values
+- Preferences
+- Emotional modifiers
+- Voice configuration
+
+Success Criteria:
+- Swapping a character changes behavior while preserving engine functionality.
+
+--------------------------------------------------
+
+PHASE 4 — EMOTIONAL STATE MODEL
+===============================
+Goal:
+- Create persistent internal state.
+
+Variables:
+- Mood
+- Energy
+- Focus
+- Curiosity
+- Engagement
+
+Effects:
+- Dialogue changes
+- Avatar behavior changes
+- Initiative changes
+
+Success Criteria:
+- Internal state affects responses consistently.
+
+--------------------------------------------------
+
+PHASE 5 — LLM INTEGRATION
+=========================
+Goal:
+- Connect language models.
+
+Components:
+- Prompt builder
+- Context assembly
+- Memory injection
+- Character injection
+
+Success Criteria:
+- Responses reflect memories, projects, and personality.
+
+--------------------------------------------------
+
+PHASE 6 — PLANNING AND EXECUTION
+================================
+Goal:
+- Separate thinking from action.
+
+Workflow:
+User Request
+→ Intent Detection
+→ Planning
+→ Tool Selection
+→ Execution
+→ Response
+
+Success Criteria:
+- LLM creates plans instead of directly executing actions.
+
+--------------------------------------------------
+
+PHASE 7 — SKILL SYSTEM
+======================
+Goal:
+- Add computer capabilities.
+
+Initial Skills:
+- File management
+- Application launching
+- Window control
+- Terminal control
+- Web search
+
+Success Criteria:
+- Aiya can complete useful desktop tasks.
+
+--------------------------------------------------
+
+PHASE 8 — OBSERVATION SYSTEM
+============================
+Goal:
+- Monitor the desktop environment.
+
+Observation Sources:
+- CPU usage
+- Memory usage
+- Storage
+- Running processes
+- Active windows
+- Network status
+
+Success Criteria:
+- Aiya can reference current system state.
+
+--------------------------------------------------
+
+PHASE 9 — INITIATIVE SYSTEM
+===========================
+Goal:
+- Allow Aiya to start interactions.
+
+Behaviors:
+- Follow-ups
+- Project check-ins
+- Memory confirmations
+- Long-term reminders
+
+Safety Rules:
+- Non-spammy
+- Context-aware
+- User-configurable
+
+Success Criteria:
+- Interactions feel proactive but not intrusive.
+
+--------------------------------------------------
+
+PHASE 10 — AVATAR FRAMEWORK
+===========================
+Goal:
+- Give Aiya a visual presence.
+
+Components:
+- Animation system
+- Emotion mapping
+- Lip sync
+- Idle behaviors
+
+Success Criteria:
+- Avatar reflects state and conversation naturally.
+
+--------------------------------------------------
+
+PHASE 11 — VOICE SYSTEM
+=======================
+Goal:
+- Natural spoken interaction.
+
+Features:
+- Speech-to-text
+- Text-to-speech
+- Voice personalities
+- Interruptions
+
+Success Criteria:
+- Voice interactions feel conversational.
+
+--------------------------------------------------
+
+PHASE 12 — PROJECT MANAGEMENT LAYER
+===================================
+Goal:
+- Track long-running user activities.
+
+Examples:
+- Software projects
+- Travel plans
+- Hobbies
+- Learning goals
+
+Success Criteria:
+- Aiya remembers and follows project progress over time.
+
+--------------------------------------------------
+
+PHASE 13 — MULTI-CHARACTER SUPPORT
+==================================
+Goal:
+- Support interchangeable companions.
+
+Character Package:
+- Personality
+- Avatar
+- Voice
+- Emotional behavior
+- Values
+
+Success Criteria:
+- New characters can be installed without modifying the engine.
+
+--------------------------------------------------
+
+PHASE 14 — POLISH AND LONG-TERM STABILITY
+=========================================
+Goal:
+- Improve reliability and user experience.
+
+Focus Areas:
+- Performance
+- Memory quality
+- Avatar quality
+- Reduced hallucinations
+- Better planning
+
+Success Criteria:
+- Daily-driver quality desktop companion.
+
+--------------------------------------------------
+
+PHASE 15 — AIYA 1.0 RELEASE
+===========================
+Release Requirements:
+- Persistent memory
+- Planning system
+- Tool use
+- Initiative
+- Avatar integration
+- Voice integration
+- Stable desktop operation
+
+Final Outcome:
+Aiya behaves as a persistent digital companion that lives on the user's computer, remembers context, assists with tasks, tracks projects, and expresses personality through a visual avatar.
