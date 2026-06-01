@@ -288,7 +288,7 @@ def on_user_input(text):
 def main():
 
     print("=" * 40)
-    print("AIYA CORE ENGINE")
+    print("Character CORE ENGINE")
     print("=" * 40)
 
     state_manager = StateManager()
