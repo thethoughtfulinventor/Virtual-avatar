@@ -1,0 +1,10 @@
+{
+    "state": {
+        "mood": 0.6,
+        "energy": 0.78,
+        "engagement": 0.6,
+        "patience": 0.8,
+        "curiosity": 0.6
+    },
+    "last_saved": "2026-06-01T10:55:44.629547"
+}
