@@ -3,6 +3,8 @@ from engine.response_generator import ResponseGenerator
 from engine.memory_retriever import MemoryRetriever
 from engine.character_manager import CharacterManager
 from engine.emotional_manager import EmotionalManager
+from engine.planner import Planner
+from engine.plan_executor import PlanExecutor
 from llm.summarizer import Summarizer
 from llm.ollama_client import OllamaClient
 from llm.prompt_builder import PromptBuilder
@@ -51,30 +53,58 @@ class Brain:
 
         self.prompt_builder = PromptBuilder()
 
-        self.summarizer = Summarizer(self.llm_client)
+        self.summarizer = Summarizer(
+            self.llm_client
+        )
+
+        # Phase 6: Planning and Execution
+        tool_registry = service_manager.get(
+            "tool_registry"
+        )
+
+        if tool_registry is None:
+
+            from engine.tool_registry import (
+                ToolRegistry
+            )
+
+            tool_registry = ToolRegistry()
+
+            print(
+                "[Brain] No tool registry in "
+                "service manager. "
+                "Using empty registry."
+            )
+
+        self.planner = Planner(
+            self.llm_client,
+            tool_registry
+        )
+
+        self.executor = PlanExecutor(tool_registry)
 
         print("Brain initialized")
 
     def process(self, text):
 
-        # Step 1: detect intent
+        # Step 1: Detect intent
         intent = (
             self.intent_detector.detect(text)
         )
 
-        # Step 2: retrieve relevant memories
+        # Step 2: Retrieve keyword memories
         memories = (
             self.memory_retriever.retrieve(text)
         )
 
-        # Step 3: update emotional state
+        # Step 3: Update emotional state
         self.emotional_manager.process(
             text,
             intent,
             self.character_manager
         )
 
-        # Step 4: get dominant state and modifier
+        # Step 4: Get dominant state and modifier
         dominant = (
             self.emotional_manager.get_dominant()
         )
@@ -85,20 +115,48 @@ class Brain:
             .get(dominant, {})
         )
 
-        # Step 5: get memory service
+        # Step 5: Get memory service
         memory = self.service_manager.get("memory")
 
-        # Step 6: build system prompt from all layers
+        # Step 6: Plan and execute
+        #
+        # For conversation-type messages the
+        # Planner asks the LLM what steps are
+        # needed. The Executor runs them and
+        # returns the results as a context string
+        # that gets injected into the response
+        # prompt.
+        #
+        # Structured commands (memory_store,
+        # project_create, etc.) are handled
+        # directly by main.py routing and do
+        # not need a planning pass.
+        plan_context = ""
+
+        if intent == "conversation":
+
+            plan = self.planner.plan(
+                text,
+                memory,
+                self.character_manager
+            )
+
+            plan_context = self.executor.execute(
+                plan,
+                memory
+            )
+
+        # Step 7: Build system prompt
         system_prompt = (
             self.prompt_builder.build_system_prompt(
                 self.character_manager,
                 self.emotional_manager,
-                memory
+                memory,
+                plan_context=plan_context
             )
         )
 
-        # Step 7: build message history
-        # (recent context + current user message)
+        # Step 8: Build message history
         recent = memory.get_recent_context(
             ModelConfig.MAX_CONTEXT
         )
@@ -113,18 +171,18 @@ class Brain:
             "content": text
         })
 
-        # Step 8: generate response via LLM
+        # Step 9: Generate response via LLM
         response = self.llm_client.chat(
             system_prompt,
             messages
         )
 
-        # Step 8b: extract and store any [REMEMBER:] facts
+        # Step 9b: Extract and store inline facts
         response = self._extract_and_store_facts(
             response, memory
         )
 
-        # Step 9: fallback if Ollama is offline
+        # Step 10: Fallback if Ollama is offline
         if not response:
 
             print(
@@ -142,7 +200,7 @@ class Brain:
                 )
             )
 
-        # Step 10: store both sides of the turn
+        # Step 11: Store both sides of the turn
         memory.add_context("user", text)
 
         memory.add_context(
@@ -151,7 +209,7 @@ class Brain:
             self.character_manager.get_name()
         )
 
-        # Step 11: compress context if needed
+        # Step 12: Compress context if needed
         self._compress_context(memory)
 
         return {
@@ -160,7 +218,7 @@ class Brain:
             "memories": memories,
             "emotional_state": dominant
         }
-    
+
     def _extract_and_store_facts(
         self,
         response,
@@ -171,7 +229,9 @@ class Brain:
         # User profile facts
         fact_pattern = r'\[REMEMBER:([^\]]+)\]'
 
-        for match in re.findall(fact_pattern, response):
+        for match in re.findall(
+            fact_pattern, response
+        ):
 
             if "=" in match:
 
@@ -194,7 +254,9 @@ class Brain:
         # Life events
         event_pattern = r'\[LIFE_EVENT:([^\]]+)\]'
 
-        for match in re.findall(event_pattern, response):
+        for match in re.findall(
+            event_pattern, response
+        ):
 
             description = match.strip()
 
@@ -203,28 +265,36 @@ class Brain:
                 memory.add_life_event(description)
 
                 print(
-                    f"[Memory] Life event: {description}"
+                    f"[Memory] Life event: "
+                    f"{description}"
                 )
 
         # Strip all tags from displayed response
-        clean = re.sub(fact_pattern, "", response)
-        clean = re.sub(event_pattern, "", clean).strip()
+        clean = re.sub(
+            fact_pattern, "", response
+        )
+
+        clean = re.sub(
+            event_pattern, "", clean
+        ).strip()
 
         return clean
-        
+
     def _compress_context(self, memory):
 
-        # Check if compression threshold is reached
-        entries = memory.recent_context.get_recent(25)
+        entries = memory.recent_context.get_recent(
+            25
+        )
 
         if len(entries) < 25:
             return
 
-        # Generate a meaningful summary via LLM
         summary = self.summarizer.summarize(entries)
 
-        # Store and trim
         memory.compress_context(summary)
 
         if summary:
-            print(f"[Memory] Episode stored: {summary[:60]}...")
+            print(
+                f"[Memory] Episode stored: "
+                f"{summary[:60]}..."
+            )

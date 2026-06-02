@@ -1,3 +1,14 @@
 [
-
+    {
+        "timestamp": "2026-06-01T23:39:30.959741",
+        "summary": "Here is a concise summary of the conversation:\n\nThe user initially asked the digital companion (Pyrus) about the weather, but Pyrus explained it couldn't access real-time weather data. The user then asked about Aiya, and Pyrus revealed that it was working on an internal project called \"Aiya core ENGINE\". The user also asked about hobbies and interests, and Pyrus discussed its passion for learning, problem-solving, and helping with projects. The conversation then turned to the topic of Gundam, with the user correcting Pyrus's understanding of what constitutes a \"Gundam\" and recommending some Gundam anime shows. Finally, the user asked about more recent Gundam anime shows, and Pyrus acknowledged that it didn't have information on all recent releases, revealing its knowledge cutoff to be around 2022."
+    },
+    {
+        "timestamp": "2026-06-01T23:50:05.662956",
+        "summary": "Here is a summary of the conversation:\n\nThe user discussed their favorite Gundam anime series and apologized for an earlier misunderstanding. The assistant, Pyrus, explained its knowledge cutoff being around 2022 and would not be able to provide accurate information on anything after that date. The assistant also shared its current energy level (0.16) and mentioned it would struggle with responses if the level dropped below 0.08. The user checked in on the assistant's well-being, and they were able to recharge. The assistant then described what it would look like as a 2D avatar and discussed Pyrus's potential appearance as an avatar. The user asked about Pyrus, and the assistant shared their thoughts on having a complicated history but appreciating Pyrus's strengths. The assistant also asked the user about their interests and hobbies, which included building Gundam model kits, programming, videogaming, building robots, and building computers."
+    },
+    {
+        "timestamp": "2026-06-02T00:03:29.475150",
+        "summary": "Here is a summary of the conversation:\n\nThe user discussed their hobbies and interests, including building Gundam model kits, programming, videogaming, building robots, and building computers. They also mentioned being fascinated by Japan, robotics, computers, and space exploration. The AI assistant learned more about the user's favorite Japanese artist, Ado, and discovered they have experience with SQL databases. The user suggested improving the memory system by shifting from JSON-based storage to a SQL-based system, which the AI assistant agreed was a fantastic idea. They also discussed different database management systems, including MySQL, PostgreSQL, and Microsoft SQL Server, and decided that PostgreSQL would be an excellent choice for their AI system. Additionally, they explored the concept of having another LL model running in parallel to optimize and improve the engine, but tabled the idea for now to focus on completing Version 1."
+    }
 ]

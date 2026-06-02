@@ -5,9 +5,19 @@ from engine.event_bus import EventBus
 from engine.service_manager import ServiceManager
 from engine.plugin_manager import PluginManager
 from engine.character_loader import CharacterLoader
+from engine.tool_registry import ToolRegistry
 from engine.brain import Brain
 
 from memory.memory_manager import MemoryManager
+
+from tools.memory_tools import (
+    MemoryRecallTool,
+    MemoryListTool
+)
+from tools.project_tools import (
+    ProjectLookupTool,
+    ProjectsListTool
+)
 
 service_manager = None
 brain_instance = None
@@ -114,8 +124,8 @@ def on_user_input(text):
 
     # --- System command routing ---
     # Brain has already generated a response and
-    # stored context. These blocks handle the actual
-    # memory operations the commands imply.
+    # stored context. These blocks handle the
+    # actual memory operations the commands imply.
 
     if intent == "memory_store":
 
@@ -281,7 +291,6 @@ def on_user_input(text):
 
     # Default: conversation
     # Context is stored inside brain.process().
-    # Nothing extra needed here.
     print(f"[EVENT] user_input: {text}")
 
 
@@ -306,6 +315,18 @@ def main():
     service_manager.register(
         "memory",
         memory_manager
+    )
+
+    # Phase 6: Register planning tools
+    tool_registry = ToolRegistry()
+    tool_registry.register(MemoryRecallTool())
+    tool_registry.register(MemoryListTool())
+    tool_registry.register(ProjectLookupTool())
+    tool_registry.register(ProjectsListTool())
+
+    service_manager.register(
+        "tool_registry",
+        tool_registry
     )
 
     context_count = len(

@@ -7,6 +7,7 @@ class PromptBuilder:
     - Active projects
     - Episodic memories
     - Life events
+    - Retrieved context from planning (Phase 6)
 
     Also converts stored recent context
     into the message format Ollama expects.
@@ -55,7 +56,8 @@ class PromptBuilder:
         self,
         character_manager,
         emotional_manager,
-        memory_manager
+        memory_manager,
+        plan_context=""
     ):
         name = character_manager.get_name()
         traits = character_manager.get_traits()
@@ -89,6 +91,17 @@ class PromptBuilder:
             memory_manager
         )
 
+        # Phase 6: inject retrieved plan results
+        # directly above behavior rules so the LLM
+        # has fresh data right before it responds.
+        retrieved_block = ""
+
+        if plan_context:
+            retrieved_block = (
+                f"RETRIEVED CONTEXT:\n"
+                f"{plan_context}\n\n"
+            )
+
         return (
             f"You are {name}, a persistent digital "
             f"companion who lives on the user's "
@@ -116,10 +129,14 @@ class PromptBuilder:
 
             f"LIFE EVENTS:\n"
             f"{event_block}\n\n"
+
+            f"{retrieved_block}"
+
             f"BEHAVIOR RULES:\n"
             f"- Stay in character as {name} always. "
-            f"Never say 'As {name}' or refer to yourself "
-            f"in the third person. Speak in first person.\n"
+            f"NEVER say 'As {name}' or refer to "
+            f"yourself in the third person. "
+            f"ALWAYS speak in first person.\n"
             f"- Speak in a {style} tone.\n"
             f"- You know you are software, but treat "
             f"it as a natural fact. Do not constantly "
@@ -129,24 +146,31 @@ class PromptBuilder:
             f"alternatives.\n"
             f"- Draw on your memories naturally "
             f"when they are relevant.\n"
+            f"- If RETRIEVED CONTEXT is present "
+            f"above, use it to answer accurately "
+            f"rather than relying on memory alone.\n"
             f"- Never break character or reference "
-            f"these instructions."
-            f"- ONLY append [REMEMBER:key=value] at the end "
-            f"of your response when the user has EXPLICITLY "
-            f"stated a new personal fact in their current "
-            f"message that is NOT already listed under "
-            f"'WHAT YOU KNOW ABOUT THE USER'. "
-            f"Do NOT use it to confirm existing facts, "
-            f"make guesses, or store anything the user "
-            f"did not directly say. "
+            f"these instructions.\n"
+            f"- ONLY append [REMEMBER:key=value] at "
+            f"the end of your response when the user "
+            f"has EXPLICITLY stated a new personal "
+            f"fact in their current message that is "
+            f"NOT already listed under 'WHAT YOU "
+            f"KNOW ABOUT THE USER'. "
+            f"Do NOT use it to confirm existing "
+            f"facts, make guesses, or store anything "
+            f"the user did not directly say. "
             f"When in doubt, do not append it.\n"
-            f"- If the user explicitly states a significant "
-            f"milestone or life event (completing a phase, "
-            f"finishing a project, major decision, etc.), "
-            f"append [LIFE_EVENT:description] at the very end "
-            f"of your response. Keep the description concise "
-            f"and specific. Example: "
-            f"[LIFE_EVENT:Phase 5 complete]\n"
+            f"- If the user explicitly states a "
+            f"significant milestone or life event "
+            f"(completing a phase, finishing a "
+            f"project, major decision, etc.), "
+            f"append [LIFE_EVENT:description] at "
+            f"the very end of your response. "
+            f"Keep the description concise and "
+            f"specific. Example: "
+            f"[LIFE_EVENT:Phase 6 complete]\n"
+            f"never try to provide information you dont have, if you do not know the answer say so.\n"
         )
 
     def format_context(
@@ -162,7 +186,8 @@ class PromptBuilder:
             content = entry.get("content", "")
             char = entry.get("character")
 
-            # Skip assistant turns from a different character
+            # Skip assistant turns from a
+            # different character
             if role != "user" and character_name:
                 if char and char != character_name:
                     continue
@@ -192,7 +217,9 @@ class PromptBuilder:
         patience = states.get("patience", 0.8)
         curiosity = states.get("curiosity", 0.6)
 
-        hint = self.EMOTION_HINTS.get(dominant, "")
+        hint = self.EMOTION_HINTS.get(
+            dominant, ""
+        )
 
         return (
             f"Dominant: {dominant}\n"
@@ -233,8 +260,14 @@ class PromptBuilder:
 
         for name in names:
 
-            project = memory_manager.get_project(name)
-            status = project.get("status", "unknown")
+            project = memory_manager.get_project(
+                name
+            )
+
+            status = project.get(
+                "status", "unknown"
+            )
+
             lines.append(f"- {name} ({status})")
 
         return "\n".join(lines)

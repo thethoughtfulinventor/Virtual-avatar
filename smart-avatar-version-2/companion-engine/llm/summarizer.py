@@ -4,8 +4,8 @@ class Summarizer:
         "You are a memory summarizer for a digital "
         "companion. Summarize the conversation below "
         "in 1-3 concise sentences. Capture what was "
-        "discussed, any facts the user shared, and any "
-        "progress or decisions made. Be specific — "
+        "discussed, any facts the user shared, any "
+        "progress or decisions made, and make sure to included the assistant's name so we can tell which ai was talking when and about what. Be specific — "
         "never write vague statements like "
         "'they had a conversation'."
     )
