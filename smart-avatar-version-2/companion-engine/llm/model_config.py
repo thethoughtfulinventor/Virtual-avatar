@@ -1,7 +1,7 @@
 class ModelConfig:
 
     # Ollama model to use
-    MODEL = "llama3"
+    MODEL = "qwen3:8b" #"llama3"
 
     # Chat endpoint — supports system prompt
     # and full message history natively

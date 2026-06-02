@@ -1,4 +1,5 @@
 {
     "user_name": "patrick",
-    "favorite_color": "red"
+    "favorite_color": "red",
+    "user_set_new_LLM": "Qwen3:8b"
 }

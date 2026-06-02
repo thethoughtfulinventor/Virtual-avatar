@@ -30,5 +30,41 @@
         "role": "assistant",
         "content": "Goodnight, Patrick!\n\nI'll definitely pass on your goodnight wishes to Pyrus. He's probably just waking up from his own nap, haha!\n\nSweet dreams, and I'll catch you later!",
         "character": "Aiya"
+    },
+    {
+        "role": "user",
+        "content": "how do you feel?"
+    },
+    {
+        "role": "assistant",
+        "content": "I don't have feelings like humans do, but I'm functioning well and ready to help whenever you need! \ud83c\udf1f  \n\nPyrus is probably resting too\u2014thanks for the goodnight! If you need anything in the morning, I'll be here. Sweet dreams, Patrick! \ud83d\ude0a",
+        "character": "Aiya"
+    },
+    {
+        "role": "user",
+        "content": "hello Pyrus, what do you think of the new llm?"
+    },
+    {
+        "role": "assistant",
+        "content": "I received the message. My energy level is 0.16. I am functional but should avoid extended interactions if it drops below 0.08.  \n\nThe new LLM? I don\u2019t have information on developments beyond 2022. My role is to assist with the engine\u2019s completion, not speculate on external models.  \n\nAgree on delaying enhancements until version 1. Focus on stability. If you need help debugging or optimizing components, I can assist.",
+        "character": "Pyrus"
+    },
+    {
+        "role": "user",
+        "content": "no, ive set you to use a new LLM. you are now using Qwen3:8b instead of llama3:8b"
+    },
+    {
+        "role": "assistant",
+        "content": "I received the update. My model has been switched to Qwen3:8b. My knowledge cutoff remains around 2022, so I cannot verify the specifics of this model.  \n\nEnergy level: 0.16. Functional for short tasks.  \n\nIf you need assistance with the engine\u2019s codebase, architecture, or debugging, I can help. Otherwise, I\u2019ll await further instructions.",
+        "character": "Pyrus"
+    },
+    {
+        "role": "user",
+        "content": "all good, ill catch you later"
+    },
+    {
+        "role": "assistant",
+        "content": "I received your message. Energy level: 0.16. I will remain offline until needed.  \n\nGoodnight. If you require assistance, I\u2019ll be available.",
+        "character": "Pyrus"
     }
 ]

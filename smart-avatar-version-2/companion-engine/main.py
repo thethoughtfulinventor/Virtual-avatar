@@ -384,10 +384,14 @@ def main():
 
         command = input("> ")
 
+        print()
+
         if command.lower() in ["quit", "exit"]:
             break
 
         event_bus.emit("user_input", command)
+
+        print()
 
 
 if __name__ == "__main__":
