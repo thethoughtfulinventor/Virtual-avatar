@@ -71,6 +71,8 @@ class Planner:
         "- Each entry: "
         '{"tool": "name", "args": {...}, '
         '"description": "one line"}.'
+        "- Do NOT use web_search for the current date "
+        "or time — it is already in the system prompt.\n"
     )
 
     def __init__(

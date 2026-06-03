@@ -2,8 +2,24 @@ import subprocess
 import shutil
 from tools.base_tool import BaseTool
 
+# Ordered by likelihood of being installed
+_TERMINAL_CANDIDATES = [
+    "konsole",
+    "gnome-terminal",
+    "xfce4-terminal",
+    "xterm",
+    "alacritty",
+    "kitty",
+    "tilix",
+    "terminator",
+    "lxterminal",
+    "urxvt",
+    "rxvt",
+    "ptyxis",
+    "kgx",
+]
+
 _ALIASES = {
-    "terminal":     "konsole",
     "browser":      "firefox",
     "firefox":      "firefox",
     "chrome":       "google-chrome",
@@ -20,6 +36,14 @@ _ALIASES = {
     "code":         "code",
     "steam":        "steam",
 }
+
+
+def _find_terminal():
+    """Returns the first available terminal emulator."""
+    for term in _TERMINAL_CANDIDATES:
+        if shutil.which(term):
+            return term
+    return None
 
 
 class AppLaunchTool(BaseTool):
@@ -45,14 +69,28 @@ class AppLaunchTool(BaseTool):
         if not app:
             return "No application specified."
 
-        command = _ALIASES.get(app.lower(), app)
-        base_cmd = command.split()[0]
+        app_lower = app.lower()
 
-        if not shutil.which(base_cmd):
-            return (
-                f"Not found: '{base_cmd}'. "
-                f"Is it installed?"
-            )
+        # Terminal gets special dynamic detection
+        if app_lower in ("terminal", "term",
+                         "console", "shell"):
+            command = _find_terminal()
+            if not command:
+                return (
+                    "No terminal emulator found. "
+                    "Tried: "
+                    + ", ".join(_TERMINAL_CANDIDATES)
+                )
+
+        else:
+            command = _ALIASES.get(app_lower, app)
+            base_cmd = command.split()[0]
+
+            if not shutil.which(base_cmd):
+                return (
+                    f"Not found: '{base_cmd}'. "
+                    f"Is it installed?"
+                )
 
         try:
 

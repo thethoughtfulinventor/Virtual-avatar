@@ -1,22 +1,25 @@
 import os
+import shutil
 from tools.base_tool import BaseTool
 
-# All file operations are sandboxed to ~
 _HOME = os.path.expanduser("~")
 _READ_LIMIT = 4000
 
 
 def _safe_path(raw_path):
     """
-    Resolves a path and verifies it stays
-    inside the user's home directory.
-    Returns None if the path escapes.
+    Resolves and validates a path.
+    Ensures it stays inside the home dir.
+    Fixes the startswith prefix collision bug
+    (e.g. /home/patricko matching /home/patrick).
     """
-
     expanded = os.path.expanduser(raw_path.strip())
     resolved = os.path.realpath(expanded)
 
-    if not resolved.startswith(_HOME):
+    if not (
+        resolved == _HOME
+        or resolved.startswith(_HOME + os.sep)
+    ):
         return None
 
     return resolved
@@ -136,16 +139,16 @@ class FileWriteTool(BaseTool):
     """
     Writes text content to a file.
 
-    Use when the user asks to create a
-    file or save text to disk.
+    Use when the user asks to create or
+    save a file with specific content.
     """
 
     name = "file_write"
     description = (
-        "Writes text to a file, creating it "
-        "if it doesn't exist. Use when the user "
-        "wants to save or create a file. "
-        "Args: path (str), content (str)."
+        "Writes text to a file, overwriting if "
+        "it already exists. Args: path (str) — "
+        "full file path, content (str) — the "
+        "complete actual text to write."
     )
 
     def run(self, args, context):
@@ -181,3 +184,128 @@ class FileWriteTool(BaseTool):
 
         except Exception as e:
             return f"Could not write file: {e}"
+
+
+class FileDeleteTool(BaseTool):
+    """
+    Deletes a single file.
+
+    Use when the user asks to delete
+    or remove a specific file.
+    """
+
+    name = "file_delete"
+    description = (
+        "Deletes a single file. "
+        "Args: path (str) — path to the file."
+    )
+
+    def run(self, args, context):
+
+        path = args.get("path", "").strip()
+
+        if not path:
+            return "No file path provided."
+
+        safe = _safe_path(path)
+
+        if not safe:
+            return "Access denied."
+
+        if not os.path.exists(safe):
+            return f"File not found: {path}"
+
+        if not os.path.isfile(safe):
+            return f"Not a file: {path}"
+
+        try:
+            os.remove(safe)
+            return f"Deleted: {safe}"
+
+        except PermissionError:
+            return f"Permission denied: {safe}"
+
+        except Exception as e:
+            return f"Could not delete: {e}"
+
+
+class FolderCreateTool(BaseTool):
+    """
+    Creates a new directory.
+
+    Use when the user asks to create
+    a folder or directory.
+    """
+
+    name = "folder_create"
+    description = (
+        "Creates a new directory (and any needed "
+        "parent dirs). Args: path (str) — "
+        "directory path to create."
+    )
+
+    def run(self, args, context):
+
+        path = args.get("path", "").strip()
+
+        if not path:
+            return "No path provided."
+
+        safe = _safe_path(path)
+
+        if not safe:
+            return "Access denied."
+
+        try:
+            os.makedirs(safe, exist_ok=True)
+            return f"Created: {safe}"
+
+        except PermissionError:
+            return f"Permission denied: {safe}"
+
+        except Exception as e:
+            return f"Could not create folder: {e}"
+
+
+class FolderDeleteTool(BaseTool):
+    """
+    Deletes a folder and all its contents.
+
+    Use when the user asks to delete a
+    directory, including non-empty ones.
+    """
+
+    name = "folder_delete"
+    description = (
+        "Deletes a folder and everything inside "
+        "it recursively. Args: path (str) — "
+        "directory to delete."
+    )
+
+    def run(self, args, context):
+
+        path = args.get("path", "").strip()
+
+        if not path:
+            return "No path provided."
+
+        safe = _safe_path(path)
+
+        if not safe:
+            return "Access denied."
+
+        if not os.path.exists(safe):
+            return f"Path not found: {path}"
+
+        if not os.path.isdir(safe):
+            return f"Not a directory: {path}"
+
+        try:
+            shutil.rmtree(safe)
+            return f"Deleted: {safe}"
+
+        except PermissionError:
+            return f"Permission denied: {safe}"
+
+        except Exception as e:
+            return f"Could not delete folder: {e}"

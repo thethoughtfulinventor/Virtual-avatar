@@ -253,6 +253,14 @@ class Brain:
             response, memory
         )
 
+        response = self._extract_and_store_facts(
+            response, memory
+        )
+        # Add this line in both places:
+        response = self._extract_response_actions(
+            response, memory
+        )
+
         if not response:
 
             print(
@@ -280,19 +288,33 @@ class Brain:
 
         self._compress_context(memory)
 
+        if character_switched:
+            name = self.character_manager.get_name()
+
+            user_content = (
+                f"{text}\n"
+                f"[You ({name}) were just routed in to "
+                f"handle this specific message. "
+                f"Respond ONLY to what the user just said "
+                f"above. Do not address or answer any "
+                f"earlier questions from the context "
+                f"history. The switch is done.]"
+            )
+
+            new_character = name
+        else:
+            user_content = text
+            new_character = None
+
         return {
             "intent": intent,
             "response": response,
             "memories": memories,
             "emotional_state": dominant,
             "character_switched": character_switched,
-            "new_character": (
-                self.character_manager.get_name()
-                if character_switched
-                else None
-            )
+            "new_character": new_character
         }
-
+    
     # --------------------------------------------------
     # Internal helpers
     # --------------------------------------------------
@@ -386,16 +408,25 @@ class Brain:
         )
 
         messages = self.prompt_builder.format_context(
-            recent, canonical
+            recent,
+            canonical
         )
 
+        # Replace with this:
         messages.append({
             "role": "user",
-            "content": text
+            "content": (
+                f"{text}\n"
+                f"[You ({canonical}) just took over. "
+                f"Respond ONLY to this current message. "
+                f"Do not revisit or answer earlier "
+                f"questions from the conversation history.]"
+            )
         })
 
         response = self.llm_client.chat(
-            system_prompt, messages
+            system_prompt,
+            messages
         )
 
         response = self._extract_and_store_facts(
@@ -435,7 +466,13 @@ class Brain:
             "switch", "request", "wants", "asked",
             "said", "current", "active", "character",
             "action", "command", "message", "response",
-            "user_request", "context", "intent"
+            "user_request", "context", "intent",
+            # Phase 7 additions — never store tool output
+            "search", "result", "file", "path", "folder",
+            "directory", "system", "cpu", "ram", "gpu",
+            "storage", "terminal", "process", "output",
+            "error", "tool", "skill", "retrieved",
+            "news", "weather", "data", "query",
         ]
 
         for match in re.findall(fact_pattern, response):
@@ -508,3 +545,49 @@ class Brain:
                 f"[Memory] Episode stored: "
                 f"{summary[:60]}..."
             )
+
+    def _extract_response_actions(
+        self, response, memory
+    ):
+        """
+        Extracts and executes [WRITE_FILE:path]
+        content[/WRITE_FILE] tags from the LLM
+        response, then strips them from the
+        displayed text.
+        """
+        import re
+
+        if not response:
+            return response
+
+        write_pattern = (
+            r'\[WRITE_FILE:([^\]]+)\]'
+            r'(.*?)'
+            r'\[/WRITE_FILE\]'
+        )
+
+        for match in re.finditer(
+            write_pattern, response, re.DOTALL
+        ):
+            path = match.group(1).strip()
+            content = match.group(2)
+
+            write_tool = self.tool_registry.get(
+                "file_write"
+            )
+
+            if write_tool:
+                result = write_tool.run(
+                    {"path": path, "content": content},
+                    {"memory": memory}
+                )
+                print(f"[FileWrite] {result}")
+
+            else:
+                print(
+                    f"[FileWrite] Tool not registered."
+                )
+
+        return re.sub(
+            write_pattern, "", response, flags=re.DOTALL
+        ).strip()

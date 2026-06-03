@@ -212,6 +212,15 @@ def on_user_input(text):
         print("Context cleared.")
 
         return
+    
+    if intent == "episode_clear":
+
+        memory.episodic_memory.episodes = []
+        memory.episodic_memory.save()
+
+        print("Episodic memory cleared.")
+
+        return
 
     if intent == "life_event_create":
 

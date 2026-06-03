@@ -1,69 +1,73 @@
 class IntentDetector:
 
-    def detect(
-        self,
-        text
-    ):
+    def detect(self, text):
 
-        text_lower = text.lower().strip()
+        t = text.lower().strip()
 
-        if text_lower.startswith(
-            "remember "
-        ):
+        if t.startswith("remember "):
             return "memory_store"
 
-        if text_lower.startswith(
-            "recall "
-        ):
+        if t.startswith("recall "):
             return "memory_recall"
 
-        if text_lower.startswith(
-            "create project "
-        ):
+        if t.startswith("create project "):
             return "project_create"
 
-        if text_lower.startswith(
-            "project "
-        ):
+        if t.startswith("project "):
             return "project_lookup"
 
-        if text_lower in [
-            "hi",
-            "hello",
-            "hey"
-        ]:
+        if t in ["hi", "hello", "hey"]:
             return "greeting"
 
-        if text_lower == "episodes":
+        if t == "episodes":
             return "episode_list"
 
-        if text_lower.startswith("episode "):
+        if t.startswith("episode "):
             return "episode_create"
 
-        if text_lower == "context":
+        if t == "context":
             return "context_view"
 
-        if text_lower == "clear context":
+        # Natural language variations for clear context
+        if any(phrase in t for phrase in [
+            "clear context",
+            "clear the context",
+            "clear our context",
+            "reset context",
+            "wipe context",
+            "forget our conversation",
+            "start fresh",
+            "start over",
+            "clear conversation",
+        ]):
             return "context_clear"
 
-        if text_lower == "projects":
+        if t == "projects":
             return "projects_list"
 
-        if text_lower == "life events":
+        if t == "life events":
             return "life_events_list"
 
-        if text_lower.startswith("life event "):
+        if t.startswith("life event "):
             return "life_event_create"
 
-        if text_lower == "state":
+        if t == "state":
             return "state_view"
 
-        # Character switching
-        # Supports: "switch to Aiya"
-        #           "switch character Pyrus"
+        # Natural language variations for clear episodes
+        if any(phrase in t for phrase in [
+            "clear episodes",
+            "clear episodic",
+            "clear memories",
+            "wipe episodes",
+            "delete episodes",
+            "forget everything",
+        ]):
+            return "episode_clear"
+
         if (
-            text_lower.startswith("switch to ")
-            or text_lower.startswith("switch character ")
+            t.startswith("switch to ")
+            or t.startswith("switch character ")
         ):
             return "switch_character"
 
