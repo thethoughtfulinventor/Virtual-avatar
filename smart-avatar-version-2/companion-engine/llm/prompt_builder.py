@@ -66,8 +66,9 @@ class PromptBuilder:
             "Ask a clarifying question before answering."
         ),
         "brief": (
-            "Keep your response to one or two "
-            "sentences. Be concise."
+            "This is a simple question. "
+            "Answer in ONE sentence only. "
+            "Do not elaborate or add context."
         )
     }
 
