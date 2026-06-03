@@ -193,6 +193,8 @@ class PromptBuilder:
             f"of your response. Keep the description concise "
             f"and specific. Example: "
             f"[LIFE_EVENT:Phase 6 complete]\n"
+            f"you do not need to end every response with something like what else can i do for you? or what else can i do?"
+            F"if asked for the time check the latest mesage in context or check system stats, DO NOT check on the internet"
         )
 
     def format_context(

@@ -4,27 +4,18 @@ import re
 
 class Planner:
     """
-    Phase 6: Pre-response planning step.
+    Phase 6+7: Pre-response planning step.
 
-    Runs before the main LLM call on every
-    conversational turn. Decides:
-
-    1. Which character is best suited to respond
-       (character routing)
-    2. What response strategy to use
-       (direct, elaborate, question, brief)
-    3. tools_needed placeholder for Phase 7+
-
-    Only runs on 'conversation' intent to avoid
-    adding latency to simple system commands.
+    Decides character routing, response
+    strategy, and which tools to run before
+    the main LLM call.
     """
 
     SYSTEM = (
         "You are an internal routing and planning "
         "system for a digital companion application. "
         "Your only job is to analyze the user's "
-        "message and decide which character should "
-        "respond and what strategy fits best.\n\n"
+        "message and produce a JSON plan.\n\n"
         "Reply ONLY with a valid JSON object. "
         "No markdown. No explanation. No extra text.\n\n"
         "JSON schema:\n"
@@ -33,51 +24,65 @@ class Planner:
         '  "reason": "one sentence",\n'
         '  "response_strategy": '
         '"direct|elaborate|question|brief",\n'
-        '  "tools_needed": []\n'
+        '  "tools_needed": [\n'
+        '    {"tool": "tool_name", '
+        '"args": {}, "description": "one line"}\n'
+        "  ]\n"
         "}\n\n"
-        "ROUTING RULES — read carefully:\n\n"
-        "Set best_character to a character name when:\n"
-        "- The user directly and immediately asks to "
-        "switch to or talk to a named character "
-        "(e.g. 'can you switch to X', 'bring in X', "
-        "'I want to talk to X', 'get X for me'). "
-        "These are immediate requests — route to that "
-        "character.\n"
-        "- The user's actual task clearly requires the "
-        "other character's specific expertise and the "
-        "mismatch with the current character is "
-        "obvious.\n\n"
-        "Set best_character to null (do NOT switch) when:\n"
-        "- The request is CONDITIONAL or FUTURE-TENSE: "
-        "it contains trigger words like 'when', 'if', "
-        "'once', 'after', 'next time', 'later' "
-        "(e.g. 'when I say apple switch to X', "
-        "'if I ask about code switch to Y'). "
-        "The condition has not been met — do not switch.\n"
-        "- The user is asking what a character would say "
-        "without wanting to actually switch.\n"
-        "- Either character could handle the request "
-        "reasonably well.\n"
+
+        "CHARACTER ROUTING — read carefully:\n\n"
+        "Set best_character to a name when:\n"
+        "- The user directly asks to switch to or "
+        "talk to a named character.\n"
+        "- The task clearly requires the other "
+        "character's specific expertise.\n\n"
+        "Set best_character to null when:\n"
+        "- The request is conditional/future-tense: "
+        "contains 'when', 'if', 'once', 'after', "
+        "'next time', 'later'.\n"
+        "- Either character could handle it.\n"
         "- When in doubt, do not switch.\n\n"
         "Never set best_character to the current "
         "character's own name.\n\n"
-        "response_strategy — pick the BEST fit:\n"
-        "    brief     = trivial/simple question, "
-        "greeting, or yes/no — ONE sentence max. "
-        "Use this for anything a child could answer.\n"
-        "    direct    = clear factual answer, "
-        "moderate complexity — a short paragraph.\n"
-        "    elaborate = in-depth explanation, "
-        "technical or complex topic — go into detail.\n"
-        "    question  = request is too vague to answer "
-        "— ask for clarification first.\n\n"
-        "tools_needed: always []."
+
+        "RESPONSE STRATEGY:\n"
+        "  brief     = trivial, greeting, yes/no.\n"
+        "  direct    = clear factual answer.\n"
+        "  elaborate = technical or complex topic.\n"
+        "  question  = request is too vague.\n\n"
+
+        "TOOLS:\n"
+        "Only add tools to tools_needed when their "
+        "output is genuinely required to answer the "
+        "question. Leave as [] if current context "
+        "is sufficient.\n"
+        "- Use web_search when the question requires "
+        "current or real-time information.\n"
+        "- Use file_list / file_read when the user "
+        "asks about files or folder contents.\n"
+        "- Use terminal_run for system queries or "
+        "when the user asks to run a command.\n"
+        "- Use system_stats for CPU, RAM, or GPU "
+        "questions.\n"
+        "- Use app_launch only when the user "
+        "explicitly asks to open an application.\n"
+        "- Do NOT use tools for memory recall — "
+        "that data is already in the system prompt.\n"
+        "- Each entry: "
+        '{"tool": "name", "args": {...}, '
+        '"description": "one line"}.'
     )
 
-    def __init__(self, llm_client, roster):
+    def __init__(
+        self,
+        llm_client,
+        roster,
+        tool_registry=None
+    ):
 
         self.llm = llm_client
         self.roster = roster
+        self.tool_registry = tool_registry
 
     def plan(
         self,
@@ -85,18 +90,6 @@ class Planner:
         current_character,
         recent_context=None
     ):
-        """
-        Analyzes a user message and returns
-        a routing + strategy plan.
-
-        Returns:
-        {
-            "best_character": str | None,
-            "reason": str,
-            "response_strategy": str,
-            "tools_needed": list
-        }
-        """
 
         current_name = current_character.get_name()
 
@@ -108,15 +101,17 @@ class Planner:
             recent_context
         )
 
+        tool_block = self._format_tools()
+
         prompt = (
             f"Current active character: {current_name}\n\n"
             f"Other available characters:\n"
             f"{roster_summary}\n\n"
             f"Recent conversation:\n"
             f"{context_snippet}\n\n"
+            f"{tool_block}"
             f"User message: {text}\n\n"
-            "Should the current character handle this, "
-            "or is another character a clearly better fit?"
+            "Produce a JSON plan."
         )
 
         messages = [
@@ -127,8 +122,19 @@ class Planner:
 
         plan = self._parse(raw, current_name)
 
+        # Log the plan concisely
+        tools_log = (
+            ", ".join(
+                t.get("tool", "?")
+                for t in plan["tools_needed"]
+            )
+            if plan["tools_needed"]
+            else "none"
+        )
+
         print(
             f"[Planner] strategy={plan['response_strategy']}"
+            f", tools={tools_log}"
             + (
                 f", route_to={plan['best_character']}"
                 f" ({plan['reason']})"
@@ -138,6 +144,29 @@ class Planner:
         )
 
         return plan
+
+    def _format_tools(self):
+        """
+        Builds the available tools block for
+        the planning prompt.
+        """
+
+        if not self.tool_registry:
+            return ""
+
+        tools = self.tool_registry.list_tools()
+
+        if not tools:
+            return ""
+
+        lines = ["Available tools:"]
+
+        for t in tools:
+            lines.append(
+                f"  {t['name']}: {t['description']}"
+            )
+
+        return "\n".join(lines) + "\n\n"
 
     def _format_context(self, recent_context):
 
@@ -151,7 +180,6 @@ class Planner:
             role = entry.get("role", "user")
             content = entry.get("content", "")
 
-            # Truncate long entries for the planner
             snippet = (
                 content[:120] + "..."
                 if len(content) > 120
@@ -176,8 +204,6 @@ class Planner:
 
         try:
 
-            # Strip markdown fences if the LLM
-            # ignores the no-markdown instruction
             clean = re.sub(
                 r"```[a-z]*", "", raw
             ).strip("` \n")
@@ -186,23 +212,19 @@ class Planner:
 
             best = data.get("best_character")
 
-            # Reject a switch back to self
             if (
                 best
                 and best.lower() == current_name.lower()
             ):
                 best = None
 
-            # Validate against known characters
             if best:
                 canonical = self.roster.resolve_name(best)
-                best = canonical  # None if not found
+                best = canonical
 
             valid_strategies = {
-                "direct",
-                "elaborate",
-                "question",
-                "brief"
+                "direct", "elaborate",
+                "question", "brief"
             }
 
             strategy = data.get(
@@ -212,13 +234,41 @@ class Planner:
             if strategy not in valid_strategies:
                 strategy = "direct"
 
+            # Validate tools_needed entries
+            raw_tools = data.get("tools_needed", [])
+            tools_needed = []
+
+            for entry in raw_tools:
+
+                if not isinstance(entry, dict):
+                    continue
+
+                tool_name = entry.get("tool", "")
+
+                if not tool_name:
+                    continue
+
+                # Only include tools that are
+                # actually registered
+                if (
+                    self.tool_registry
+                    and not self.tool_registry.has(
+                        tool_name
+                    )
+                ):
+                    print(
+                        f"[Planner] Unknown tool "
+                        f"skipped: {tool_name}"
+                    )
+                    continue
+
+                tools_needed.append(entry)
+
             return {
                 "best_character": best,
                 "reason": data.get("reason", ""),
                 "response_strategy": strategy,
-                "tools_needed": data.get(
-                    "tools_needed", []
-                )
+                "tools_needed": tools_needed
             }
 
         except Exception:

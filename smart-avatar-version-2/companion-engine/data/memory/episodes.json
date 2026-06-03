@@ -1,10 +1,3 @@
 [
-    {
-        "timestamp": "2026-06-02T20:50:38.029610",
-        "summary": "The user and Aiya discussed switching between personas (Pyrus and Aiya), clarifying that Aiya cannot switch to Pyrus unless explicitly requested. They debated their specializations: Pyrus excels in technical logic and optimization, while Aiya focuses on collaborative, exploratory problem-solving. The user acknowledged the auto-switching system\u2019s limitations and agreed to delay discussions on file access until more functionality is added. Aiya emphasized the need for explicit control over context shifts."
-    },
-    {
-        "timestamp": "2026-06-02T21:16:34.843301",
-        "summary": "Assistant: The user tested switching between AI personas (Pyrus/Aiya) and clarified that direct requests are needed, not keywords. They shared progress on Phase 7 of a project and asked about neural networks, which Assistant explained. The user noted the frequent use of apples in responses, prompting Assistant to explain it\u2019s a friendly symbol, and the user expressed fondness for apples. Assistant maintained a cheerful, emoji-laden tone throughout."
-    }
+
 ]

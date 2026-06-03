@@ -3,6 +3,9 @@ from engine.response_generator import ResponseGenerator
 from engine.memory_retriever import MemoryRetriever
 from engine.character_manager import CharacterManager
 from engine.emotional_manager import EmotionalManager
+from engine.tool_registry import ToolRegistry
+from engine.plan_executor import PlanExecutor
+from engine.plan import Plan, PlanStep
 from llm.summarizer import Summarizer
 from llm.ollama_client import OllamaClient
 from llm.prompt_builder import PromptBuilder
@@ -27,7 +30,6 @@ class Brain:
 
         self.intent_detector = IntentDetector()
 
-        # Kept as fallback when LLM is offline
         self.response_generator = (
             ResponseGenerator()
         )
@@ -56,9 +58,20 @@ class Brain:
 
         self.summarizer = Summarizer(self.llm_client)
 
+        # Phase 7: skill registry and executor
+        self.tool_registry = ToolRegistry()
+
+        self.plan_executor = PlanExecutor(
+            self.tool_registry
+        )
+
+        # Planner now receives the tool registry
+        # so it can include available skills in
+        # its planning prompt.
         self.planner = Planner(
             self.llm_client,
-            roster
+            roster,
+            self.tool_registry
         )
 
         print("Brain initialized")
@@ -68,16 +81,6 @@ class Brain:
     # --------------------------------------------------
 
     def switch_character(self, name):
-        """
-        Switches the active character mid-session.
-
-        Reinitializes CharacterManager and
-        EmotionalManager for the new character.
-        Shared memory is preserved.
-
-        Returns the canonical character name on
-        success, or None if not found.
-        """
 
         canonical = self.roster.resolve_name(name)
 
@@ -116,28 +119,19 @@ class Brain:
 
     def process(self, text):
 
-        # Step 1: detect intent
         intent = (
             self.intent_detector.detect(text)
         )
 
-        # Get memory service once — used throughout
         memory = self.service_manager.get("memory")
 
-        # Step 2: handle explicit character switch
-        # before any other processing
         if intent == "switch_character":
             return self._handle_switch(text, memory)
 
-        # Step 3: retrieve relevant memories
         memories = (
             self.memory_retriever.retrieve(text)
         )
 
-        # Step 4: run planner for conversation turns
-        # Planner decides character routing and
-        # response strategy. Skipped for system
-        # commands to avoid extra LLM latency.
         plan = {
             "best_character": None,
             "reason": "",
@@ -147,10 +141,12 @@ class Brain:
 
         character_switched = False
 
+        # Phase 6+7: run planner for all conversation
+        # turns when enabled — now also handles
+        # tool selection regardless of character count.
         if (
             intent == "conversation"
             and ModelConfig.ENABLE_PLANNER
-            and len(self.roster.get_names()) > 1
         ):
 
             recent_for_plan = (
@@ -163,8 +159,6 @@ class Brain:
                 recent_for_plan
             )
 
-            # Auto-route to the recommended character
-            # before generating the response
             if plan["best_character"]:
 
                 canonical = self.switch_character(
@@ -178,14 +172,22 @@ class Brain:
                         f"{canonical}: {plan['reason']}"
                     )
 
-        # Step 5: update emotional state
+        # Phase 7: execute any tools the planner
+        # requested, then inject results into the
+        # system prompt before the main LLM call.
+        retrieved_context = ""
+
+        if plan.get("tools_needed"):
+
+            retrieved_context = self._execute_tools(
+                plan["tools_needed"], memory
+            )
+
+        # Emotional state
         self.emotional_manager.process(
-            text,
-            intent,
-            self.character_manager
+            text, intent, self.character_manager
         )
 
-        # Step 6: get dominant state and modifier
         dominant = (
             self.emotional_manager.get_dominant()
         )
@@ -196,7 +198,7 @@ class Brain:
             .get(dominant, {})
         )
 
-        # Step 7: build system prompt from all layers
+        # Build system prompt
         system_prompt = (
             self.prompt_builder.build_system_prompt(
                 self.character_manager,
@@ -207,7 +209,14 @@ class Brain:
             )
         )
 
-        # Step 8: build message history
+        # Inject tool results so the LLM answers
+        # with real data, not hallucinated facts.
+        if retrieved_context:
+            system_prompt += (
+                f"\n\nRETRIEVED CONTEXT:\n"
+                f"{retrieved_context}"
+            )
+
         recent = memory.get_recent_context(
             ModelConfig.MAX_CONTEXT
         )
@@ -217,10 +226,6 @@ class Brain:
             self.character_manager.get_name()
         )
 
-        # When the planner auto-switched characters,
-        # append a brief note so the new character
-        # understands it was just routed in and
-        # doesn't respond as if it needs to switch.
         user_content = text
 
         if character_switched:
@@ -240,18 +245,14 @@ class Brain:
             "content": user_content
         })
 
-        # Step 9: generate LLM response
         response = self.llm_client.chat(
-            system_prompt,
-            messages
+            system_prompt, messages
         )
 
-        # Step 10: extract and store any facts/events
         response = self._extract_and_store_facts(
             response, memory
         )
 
-        # Step 11: fallback if Ollama is offline
         if not response:
 
             print(
@@ -269,7 +270,6 @@ class Brain:
                 )
             )
 
-        # Step 12: store both sides of the turn
         memory.add_context("user", text)
 
         memory.add_context(
@@ -278,7 +278,6 @@ class Brain:
             self.character_manager.get_name()
         )
 
-        # Step 13: compress context if needed
         self._compress_context(memory)
 
         return {
@@ -298,14 +297,47 @@ class Brain:
     # Internal helpers
     # --------------------------------------------------
 
-    def _handle_switch(self, text, memory):
+    def _execute_tools(self, tools_needed, memory):
         """
-        Handles an explicit 'switch character' or
-        'switch to' command from the user.
+        Converts the planner's tools_needed list
+        into a Plan, runs it through PlanExecutor,
+        and returns the formatted results string.
+        """
 
-        Switches the character, then has the new
-        character respond to the switch request.
-        """
+        if not tools_needed:
+            return ""
+
+        execution_plan = Plan(goal="tool_execution")
+
+        for tool_call in tools_needed:
+
+            if not isinstance(tool_call, dict):
+                continue
+
+            tool_name = tool_call.get("tool", "")
+
+            if not tool_name or tool_name == "respond":
+                continue
+
+            execution_plan.steps.append(
+                PlanStep(
+                    tool=tool_name,
+                    args=tool_call.get("args", {}),
+                    description=tool_call.get(
+                        "description", tool_name
+                    )
+                )
+            )
+
+        execution_plan.steps.append(
+            PlanStep(tool="respond")
+        )
+
+        return self.plan_executor.execute(
+            execution_plan, memory
+        )
+
+    def _handle_switch(self, text, memory):
 
         text_lower = text.lower().strip()
 
@@ -315,8 +347,6 @@ class Brain:
             .replace("switch to ", "")
             .strip()
         )
-
-        old_name = self.character_manager.get_name()
 
         canonical = self.switch_character(name)
 
@@ -342,8 +372,6 @@ class Brain:
                 "new_character": None
             }
 
-        # Have the new character acknowledge
-        # the switch naturally
         system_prompt = (
             self.prompt_builder.build_system_prompt(
                 self.character_manager,
@@ -358,19 +386,16 @@ class Brain:
         )
 
         messages = self.prompt_builder.format_context(
-            recent,
-            canonical
+            recent, canonical
         )
 
-        # The new character sees the switch request
         messages.append({
             "role": "user",
             "content": text
         })
 
         response = self.llm_client.chat(
-            system_prompt,
-            messages
+            system_prompt, messages
         )
 
         response = self._extract_and_store_facts(
@@ -382,9 +407,7 @@ class Brain:
 
         memory.add_context("user", text)
         memory.add_context(
-            "assistant",
-            response,
-            canonical
+            "assistant", response, canonical
         )
 
         return {
@@ -399,22 +422,15 @@ class Brain:
         }
 
     def _extract_and_store_facts(
-        self,
-        response,
-        memory
+        self, response, memory
     ):
         import re
 
         if not response:
             return response
 
-        # User profile facts
         fact_pattern = r'\[REMEMBER:([^\]]+)\]'
 
-        # Keys containing these words are almost
-        # never legitimate user profile facts.
-        # They indicate the LLM tagging its own
-        # internal state or conversation metadata.
         key_blacklist = [
             "switch", "request", "wants", "asked",
             "said", "current", "active", "character",
@@ -431,7 +447,6 @@ class Brain:
                 value = value.strip()
                 key_lower = key.lower()
 
-                # Reject metadata keys
                 if any(
                     bad in key_lower
                     for bad in key_blacklist
@@ -442,12 +457,10 @@ class Brain:
                     )
                     continue
 
-                # Reject bare booleans —
-                # real user facts have actual values
                 if value.lower() in ("true", "false"):
                     print(
                         f"[Memory] Rejected tag "
-                        f"(boolean value): {key}"
+                        f"(boolean): {key}"
                     )
                     continue
 
@@ -458,12 +471,8 @@ class Brain:
 
                 memory.remember(key, value)
 
-                print(
-                    f"[Memory] Stored: "
-                    f"{key} = {value}"
-                )
+                print(f"[Memory] Stored: {key} = {value}")
 
-        # Life events
         event_pattern = r'\[LIFE_EVENT:([^\]]+)\]'
 
         for match in re.findall(event_pattern, response):
@@ -478,7 +487,6 @@ class Brain:
                     f"[Memory] Life event: {description}"
                 )
 
-        # Strip all tags from displayed response
         clean = re.sub(fact_pattern, "", response)
         clean = re.sub(event_pattern, "", clean).strip()
 

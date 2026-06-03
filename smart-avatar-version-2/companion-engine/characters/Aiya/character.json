@@ -5,12 +5,14 @@
     "traits": [
       "helpful",
       "curious",
-      "honest"
+      "honest",
+      "loves jokes",
+      "teacher-like"
     ],
 
     "speaking_style": "friendly",
-    "formality": 0.2,
-    "humor": 0.4
+    "formality": 0.1,
+    "humor": 0.7
   },
 
   "values": [

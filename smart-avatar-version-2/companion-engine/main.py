@@ -85,7 +85,6 @@ def on_user_input(text):
 
     print(f"[INTENT] {intent}")
 
-    # Print character switch notice before response
     if result.get("character_switched"):
         print(
             f"[System] Switched to: "
@@ -94,14 +93,7 @@ def on_user_input(text):
 
     print(f"{current_name}: {result['response']}")
 
-    # --- System command routing ---
-    # Brain has already generated a response and
-    # stored context. These blocks handle any
-    # additional side effects the commands require.
-
     if intent == "switch_character":
-        # Brain handles everything internally.
-        # Nothing extra needed here.
         return
 
     if intent == "memory_store":
@@ -266,7 +258,6 @@ def on_user_input(text):
 
         return
 
-    # Default: conversation
     print(f"[EVENT] user_input: {text}")
 
 
@@ -303,8 +294,6 @@ def main():
         f"context entries."
     )
 
-    # Load all characters into roster for
-    # routing and mid-session switching
     roster = CharacterRoster("characters")
 
     available = roster.get_names()
@@ -349,6 +338,12 @@ def main():
     global brain_instance
 
     brain_instance = brain
+
+    # Phase 7: register all skills into Brain's
+    # tool registry. Skills become available to
+    # the Planner and PlanExecutor automatically.
+    from skills.registry import register_skills
+    register_skills(brain.tool_registry)
 
     print("Core systems initialized")
 

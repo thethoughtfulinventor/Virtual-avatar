@@ -6,6 +6,7 @@ Virtual Avatar V1 (full version)
 
         Python 3
         llama3
+        ddgs (pip)
 
 Virtual Avatar V2 (V0.6) current workng model
 
@@ -13,3 +14,5 @@ Virtual Avatar V2 (V0.6) current workng model
         
         any ollama LLM
         you will have to set it to which LLM in /llm/model_config.py
+        ddgs (pip)
+        cuda 
