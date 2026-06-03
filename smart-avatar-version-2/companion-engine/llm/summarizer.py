@@ -1,13 +1,13 @@
 class Summarizer:
 
     SYSTEM = (
-        "You are a memory summarizer for a digital "
-        "companion. Summarize the conversation below "
-        "in 1-3 concise sentences. Capture what was "
-        "discussed, any facts the user or assistant shared, any "
-        "progress or decisions made, and make sure to included the assistant's name so we can tell which ai was talking when and about what. Be specific — "
-        "never write vague statements like "
-        "'they had a conversation'."
+        "Summarize the conversation in 1–3 concise sentences, "
+        "capturing key facts, decisions, and progress. "
+        "Explicitly identify every persona change by stating "
+        "'The persona switches to [Character Name]' or "
+        "'[Character Name] takes over' at the exact point the character changes."
+        " Ensure the assistant's name is included to attribute statements correctly, "
+        "avoiding vague descriptions of the dialogue flow."
     )
 
     def __init__(self, llm_client):

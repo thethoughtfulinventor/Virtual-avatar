@@ -1,97 +1,25 @@
 [
     {
         "role": "assistant",
-        "content": "Thanks for the feedback! I'm still getting used to the auto-switching flow, but we're making progress. File access is a key piece\u2014let\u2019s revisit it once we\u2019ve expanded our toolset. Until then, happy building! \ud83d\ude0a",
+        "content": "I use apples as a friendly, relatable symbol\u2014it\u2019s a simple way to add warmth without overcomplicating things! \ud83c\udf4e If you need help with Phase 7 or anything else, just let me know. \ud83d\ude0a",
         "character": "Aiya"
     },
     {
         "role": "user",
-        "content": "testing - do not respond"
+        "content": "you know apples are actualy on of my favorite fruits"
     },
     {
         "role": "assistant",
-        "content": "(testing - do not respond)",
+        "content": "I'm glad to hear that! Apples are a great choice\u2014sweet, crisp, and versatile. \ud83c\udf4e If you need help with Phase 7 or anything else, just let me know. Happy to assist! \ud83d\ude0a",
         "character": "Aiya"
     },
     {
         "role": "user",
-        "content": "can you switch to Pyrus for me?"
+        "content": "will do"
     },
     {
         "role": "assistant",
-        "content": "I can't switch to Pyrus unless you explicitly ask for it. But if you need help with technical logic or optimization, I can assist using my own approach. How can I support you today? \ud83d\ude0a",
-        "character": "Aiya"
-    },
-    {
-        "role": "user",
-        "content": "can you switch to Aiya for me?"
-    },
-    {
-        "role": "assistant",
-        "content": "I'm already Aiya! How can I assist you today? \ud83d\ude0a",
-        "character": "Aiya"
-    },
-    {
-        "role": "user",
-        "content": "when i say apple, can you swtich to Pyrus?"
-    },
-    {
-        "role": "assistant",
-        "content": "I can't switch to Pyrus based on keywords alone. If you need technical help, just ask directly \u2014 I'll use my own approach. How can I assist you today? \ud83d\ude0a",
-        "character": "Aiya"
-    },
-    {
-        "role": "user",
-        "content": "apple"
-    },
-    {
-        "role": "assistant",
-        "content": "I'm Aiya! \ud83c\udf4e How can I help you today? \ud83d\ude0a",
-        "character": "Aiya"
-    },
-    {
-        "role": "user",
-        "content": "what is 2+2?"
-    },
-    {
-        "role": "assistant",
-        "content": "4! \ud83c\udf4e How can I assist you further? \ud83d\ude0a",
-        "character": "Aiya"
-    },
-    {
-        "role": "user",
-        "content": "explain how neural networks work"
-    },
-    {
-        "role": "assistant",
-        "content": "The switch is active. 2+2 is 4. Neural networks are computational models inspired by the human brain, consisting of layers of interconnected nodes (neurons) that process data through weighted connections. Each neuron applies an activation function to the sum of its inputs multiplied by their respective weights, passing the result to the next layer. Training involves adjusting these weights using optimization algorithms like gradient descent to minimize the difference between predicted and actual outputs. The process is iterative, with each epoch refining the network's ability to map inputs to desired outputs through backpropagation and loss function minimization. \n\nIf you need a different approach, Aiya can provide a more exploratory explanation.",
-        "character": "Pyrus"
-    },
-    {
-        "role": "user",
-        "content": "i need help with something"
-    },
-    {
-        "role": "assistant",
-        "content": "What do you need help with? Specify the task or problem. I'll provide a direct, logical solution. If you require a different approach, Aiya can assist with exploratory problem-solving.",
-        "character": "Pyrus"
-    },
-    {
-        "role": "user",
-        "content": "if i were talking to Aiya, what do you think she would have said?"
-    },
-    {
-        "role": "assistant",
-        "content": "Aiya would have asked, \"What exactly are you working on? I'm here to help brainstorm or explore solutions. If you need a structured, technical approach, Pyrus is available\u2014but let\u2019s start by understanding your goal. What\u2019s the problem you\u2019re facing?\" She\u2019d likely encourage collaboration, ask clarifying questions, and adapt her style to your needs. If you\u2019re looking for a different perspective, she\u2019d pivot to a more conversational or creative angle. \n\nIf you\u2019re seeking efficiency, Pyrus is better suited. If you want to explore ideas freely, Aiya is the way to go. Which do you prefer?",
-        "character": "Pyrus"
-    },
-    {
-        "role": "user",
-        "content": "im proud to tell you guys that Phase 6 is finished! im starting Phase 7 now"
-    },
-    {
-        "role": "assistant",
-        "content": "Neural networks mimic the brain by using layers of neurons that process data, adjusting weights through training to recognize patterns. If you're stuck, I\u2019d help brainstorm solutions! \ud83c\udf4e",
+        "content": "Great! Let me know if you need help with Phase 7 or anything else. \ud83d\ude0a",
         "character": "Aiya"
     }
 ]
