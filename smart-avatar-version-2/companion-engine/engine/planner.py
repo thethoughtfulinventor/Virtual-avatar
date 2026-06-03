@@ -1,271 +1,218 @@
 import json
 import re
 
-from engine.plan import Plan, PlanStep
-
 
 class Planner:
     """
-    Phase 6: Planning layer.
+    Phase 6: Pre-response planning step.
 
-    The Planner uses the LLM to decide what
-    to do before the response is generated.
+    Runs before the main LLM call on every
+    conversational turn. Decides:
 
-    Given the user's message and a list of
-    available tools, it outputs a structured
-    JSON plan. The PlanExecutor then runs
-    each step and collects the results, which
-    are injected into the system prompt so
-    the LLM can answer with real data in hand.
+    1. Which character is best suited to respond
+       (character routing)
+    2. What response strategy to use
+       (direct, elaborate, question, brief)
+    3. tools_needed placeholder for Phase 7+
 
-    This separates thinking from action:
-
-        User message
-            → Planner (LLM pass 1 — what to do)
-            → PlanExecutor (run the steps)
-            → Brain (LLM pass 2 — respond)
+    Only runs on 'conversation' intent to avoid
+    adding latency to simple system commands.
     """
 
     SYSTEM = (
-        "You are the planning module for a "
-        "digital companion. Given a user message "
-        "and a list of available tools, output a "
-        "JSON execution plan.\n\n"
-        "Output ONLY valid JSON. "
-        "No explanation. No markdown. No code "
-        "blocks. Just the JSON object.\n\n"
-        "Required format:\n"
+        "You are an internal routing and planning "
+        "system for a digital companion application. "
+        "Your only job is to analyze the user's "
+        "message and decide which character should "
+        "respond and what strategy fits best.\n\n"
+        "Reply ONLY with a valid JSON object. "
+        "No markdown. No explanation. No extra text.\n\n"
+        "JSON schema:\n"
         "{\n"
-        "  \"goal\": \"brief description of "
-        "what the user wants\",\n"
-        "  \"steps\": [\n"
-        "    {\n"
-        "      \"tool\": \"tool_name\",\n"
-        "      \"args\": {},\n"
-        "      \"description\": "
-        "\"what this step does\"\n"
-        "    }\n"
-        "  ]\n"
+        '  "best_character": "CharacterName or null",\n'
+        '  "reason": "one sentence",\n'
+        '  "response_strategy": '
+        '"direct|elaborate|question|brief",\n'
+        '  "tools_needed": []\n'
         "}\n\n"
-        "Rules:\n"
-        "- Only include steps that are directly "
-        "needed to answer the request.\n"
-        "- The last step must always be: "
-        "{\"tool\": \"respond\", \"args\": {}}.\n"
-        "- If no tools are needed, include only "
-        "the respond step.\n"
-        "- Keep plans minimal. "
-        "Do not add unnecessary steps.\n"
-        "- Output only the JSON. Nothing else."
+        "ROUTING RULES — read carefully:\n\n"
+        "Set best_character to null (no switch) when:\n"
+        "- The user is talking ABOUT switching, or "
+        "mentioning a character name in conversation "
+        "(e.g. 'can you switch to X', 'when I say X "
+        "switch to Y', 'what would X say'). "
+        "These are conversational — the current "
+        "character handles them.\n"
+        "- The request is hypothetical or conditional "
+        "('if I say X then switch to Y').\n"
+        "- Either character could handle the request "
+        "reasonably well.\n"
+        "- The current character is already a good fit.\n"
+        "- When in doubt, do not switch.\n\n"
+        "Set best_character to a name ONLY when:\n"
+        "- The user's actual TASK clearly requires the "
+        "other character's specific expertise or "
+        "personality, and the mismatch with the current "
+        "character is obvious and significant.\n"
+        "- Example: a highly technical precision task "
+        "going to a character with 'cynical, precise' "
+        "traits over one with 'friendly, curious'.\n\n"
+        "Never set best_character to the current "
+        "character's own name.\n\n"
+        "response_strategy:\n"
+        "    direct    = clear factual answer\n"
+        "    elaborate = in-depth explanation\n"
+        "    question  = ask for clarification first\n"
+        "    brief     = one or two sentences only\n\n"
+        "tools_needed: always []."
     )
 
-    def __init__(
-        self,
-        llm_client,
-        tool_registry
-    ):
+    def __init__(self, llm_client, roster):
+
         self.llm = llm_client
-        self.tools = tool_registry
+        self.roster = roster
 
     def plan(
         self,
         text,
-        memory,
-        character_manager
+        current_character,
+        recent_context=None
     ):
         """
-        Produce a Plan for the given user
-        message by asking the LLM to reason
-        about what steps are needed.
+        Analyzes a user message and returns
+        a routing + strategy plan.
 
-        Falls back to a minimal respond-only
-        plan if the LLM is unavailable or
-        returns unparseable output.
+        Returns:
+        {
+            "best_character": str | None,
+            "reason": str,
+            "response_strategy": str,
+            "tools_needed": list
+        }
         """
 
-        tool_list = self._format_tools()
-        context_summary = self._format_context(
-            memory
+        current_name = current_character.get_name()
+
+        roster_summary = self.roster.get_summary(
+            exclude=current_name
         )
 
-        user_message = (
-            f"User said: \"{text}\"\n\n"
-            f"Available tools:\n{tool_list}\n\n"
-            f"Current context:\n{context_summary}"
+        context_snippet = self._format_context(
+            recent_context
+        )
+
+        prompt = (
+            f"Current active character: {current_name}\n\n"
+            f"Other available characters:\n"
+            f"{roster_summary}\n\n"
+            f"Recent conversation:\n"
+            f"{context_snippet}\n\n"
+            f"User message: {text}\n\n"
+            "Should the current character handle this, "
+            "or is another character a clearly better fit?"
         )
 
         messages = [
-            {
-                "role": "user",
-                "content": user_message
-            }
+            {"role": "user", "content": prompt}
         ]
 
-        raw = self.llm.chat(
-            self.SYSTEM,
-            messages
+        raw = self.llm.chat(self.SYSTEM, messages)
+
+        plan = self._parse(raw, current_name)
+
+        print(
+            f"[Planner] strategy={plan['response_strategy']}"
+            + (
+                f", route_to={plan['best_character']}"
+                f" ({plan['reason']})"
+                if plan["best_character"]
+                else ""
+            )
         )
-
-        plan = self._parse_plan(raw)
-
-        if plan:
-
-            print(
-                f"[Planner] Goal: {plan.goal}"
-            )
-
-            for step in plan.steps:
-                print(
-                    f"  -> {step.tool}"
-                    f"({json.dumps(step.args)})"
-                )
-
-        else:
-
-            print(
-                "[Planner] Could not parse plan. "
-                "Using fallback."
-            )
-
-            plan = self._fallback_plan()
 
         return plan
 
-    # --- Private helpers ---
+    def _format_context(self, recent_context):
 
-    def _format_tools(self):
-
-        tools = self.tools.list_tools()
+        if not recent_context:
+            return "(no recent context)"
 
         lines = []
 
-        for t in tools:
-            lines.append(
-                f"- {t['name']}: "
-                f"{t['description']}"
+        for entry in recent_context[-4:]:
+
+            role = entry.get("role", "user")
+            content = entry.get("content", "")
+
+            # Truncate long entries for the planner
+            snippet = (
+                content[:120] + "..."
+                if len(content) > 120
+                else content
             )
 
-        lines.append(
-            "- respond: Generate the final "
-            "conversational response "
-            "(always the last step)"
-        )
+            lines.append(f"{role}: {snippet}")
 
         return "\n".join(lines)
 
-    def _format_context(self, memory):
+    def _parse(self, raw, current_name):
 
-        lines = []
-
-        profile = memory.user_profile.data
-
-        if profile:
-            facts = ", ".join(
-                f"{k}={v}"
-                for k, v in profile.items()
-            )
-            lines.append(
-                f"Known user facts: {facts}"
-            )
-
-        projects = memory.list_projects()
-
-        if projects:
-            lines.append(
-                f"Active projects: "
-                f"{', '.join(projects)}"
-            )
-
-        return (
-            "\n".join(lines)
-            if lines
-            else "No special context."
-        )
-
-    def _parse_plan(self, raw):
+        default = {
+            "best_character": None,
+            "reason": "",
+            "response_strategy": "direct",
+            "tools_needed": []
+        }
 
         if not raw:
-            return None
+            return default
 
         try:
 
-            # Strip markdown fences if present
+            # Strip markdown fences if the LLM
+            # ignores the no-markdown instruction
             clean = re.sub(
-                r'```[a-zA-Z]*\n?',
-                '',
-                raw
-            ).strip()
+                r"```[a-z]*", "", raw
+            ).strip("` \n")
 
-            # Extract the first JSON object found
-            match = re.search(
-                r'\{.*\}',
-                clean,
-                re.DOTALL
-            )
+            data = json.loads(clean)
 
-            if not match:
-                return None
+            best = data.get("best_character")
 
-            data = json.loads(match.group())
-
-            goal = data.get(
-                "goal",
-                "Respond to user"
-            )
-
-            steps_data = data.get("steps", [])
-
-            steps = []
-
-            for s in steps_data:
-
-                tool = s.get("tool", "respond")
-                args = s.get("args", {})
-                desc = s.get("description", "")
-
-                steps.append(
-                    PlanStep(
-                        tool=tool,
-                        args=args,
-                        description=desc
-                    )
-                )
-
-            # Always ensure plan ends with respond
+            # Reject a switch back to self
             if (
-                not steps
-                or steps[-1].tool != "respond"
+                best
+                and best.lower() == current_name.lower()
             ):
-                steps.append(
-                    PlanStep(
-                        tool="respond",
-                        args={},
-                        description=(
-                            "Generate response"
-                        )
-                    )
+                best = None
+
+            # Validate against known characters
+            if best:
+                canonical = self.roster.resolve_name(best)
+                best = canonical  # None if not found
+
+            valid_strategies = {
+                "direct",
+                "elaborate",
+                "question",
+                "brief"
+            }
+
+            strategy = data.get(
+                "response_strategy", "direct"
+            )
+
+            if strategy not in valid_strategies:
+                strategy = "direct"
+
+            return {
+                "best_character": best,
+                "reason": data.get("reason", ""),
+                "response_strategy": strategy,
+                "tools_needed": data.get(
+                    "tools_needed", []
                 )
+            }
 
-            return Plan(goal=goal, steps=steps)
-
-        except Exception as e:
-
-            print(f"[Planner] Parse error: {e}")
-
-            return None
-
-    def _fallback_plan(self):
-
-        return Plan(
-            goal="Respond to user message",
-            steps=[
-                PlanStep(
-                    tool="respond",
-                    args={},
-                    description=(
-                        "Generate conversational "
-                        "response"
-                    )
-                )
-            ]
-        )
+        except Exception:
+            return default

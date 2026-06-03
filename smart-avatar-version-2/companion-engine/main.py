@@ -5,52 +5,16 @@ from engine.event_bus import EventBus
 from engine.service_manager import ServiceManager
 from engine.plugin_manager import PluginManager
 from engine.character_loader import CharacterLoader
-from engine.tool_registry import ToolRegistry
+from engine.character_roster import CharacterRoster
 from engine.brain import Brain
 
 from memory.memory_manager import MemoryManager
-
-from tools.memory_tools import (
-    MemoryRecallTool,
-    MemoryListTool
-)
-from tools.project_tools import (
-    ProjectLookupTool,
-    ProjectsListTool
-)
 
 service_manager = None
 brain_instance = None
 
 
-def select_character():
-
-    characters_dir = "characters"
-
-    available = []
-
-    for entry in os.listdir(
-        characters_dir
-    ):
-
-        char_path = os.path.join(
-            characters_dir,
-            entry
-        )
-
-        config_path = os.path.join(
-            char_path,
-            "character.json"
-        )
-
-        if (
-            os.path.isdir(char_path)
-            and os.path.exists(config_path)
-        ):
-
-            available.append(entry)
-
-    available.sort()
+def select_character(available):
 
     if not available:
 
@@ -115,17 +79,30 @@ def on_user_input(text):
 
     intent = result["intent"]
 
+    current_name = (
+        brain_instance.character_manager.get_name()
+    )
+
     print(f"[INTENT] {intent}")
 
-    print(
-        f"{brain_instance.character_manager.get_name()}"
-        f": {result['response']}"
-    )
+    # Print character switch notice before response
+    if result.get("character_switched"):
+        print(
+            f"[System] Switched to: "
+            f"{result['new_character']}"
+        )
+
+    print(f"{current_name}: {result['response']}")
 
     # --- System command routing ---
     # Brain has already generated a response and
-    # stored context. These blocks handle the
-    # actual memory operations the commands imply.
+    # stored context. These blocks handle any
+    # additional side effects the commands require.
+
+    if intent == "switch_character":
+        # Brain handles everything internally.
+        # Nothing extra needed here.
+        return
 
     if intent == "memory_store":
 
@@ -290,7 +267,6 @@ def on_user_input(text):
         return
 
     # Default: conversation
-    # Context is stored inside brain.process().
     print(f"[EVENT] user_input: {text}")
 
 
@@ -317,18 +293,6 @@ def main():
         memory_manager
     )
 
-    # Phase 6: Register planning tools
-    tool_registry = ToolRegistry()
-    tool_registry.register(MemoryRecallTool())
-    tool_registry.register(MemoryListTool())
-    tool_registry.register(ProjectLookupTool())
-    tool_registry.register(ProjectsListTool())
-
-    service_manager.register(
-        "tool_registry",
-        tool_registry
-    )
-
     context_count = len(
         memory_manager.get_recent_context(100)
     )
@@ -337,6 +301,17 @@ def main():
         f"Restored "
         f"{context_count} "
         f"context entries."
+    )
+
+    # Load all characters into roster for
+    # routing and mid-session switching
+    roster = CharacterRoster("characters")
+
+    available = roster.get_names()
+
+    print(
+        f"Characters available: "
+        f"{', '.join(available)}"
     )
 
     event_bus.subscribe(
@@ -349,9 +324,9 @@ def main():
         on_user_input
     )
 
-    character_loader = CharacterLoader()
+    selected = select_character(available)
 
-    selected = select_character()
+    character_loader = CharacterLoader()
 
     character = character_loader.load(
         f"characters/{selected}"
@@ -367,7 +342,8 @@ def main():
     brain = Brain(
         state_manager,
         event_bus,
-        service_manager
+        service_manager,
+        roster
     )
 
     global brain_instance
@@ -378,20 +354,46 @@ def main():
 
     event_bus.emit("engine_started")
 
+    print("=" * 40)
+    print("Commands:")
+    print("  switch to <name>       — change character")
+    print("  switch character <name>")
+    print("  remember key=value     — store a fact")
+    print("  recall <key>           — retrieve a fact")
+    print("  state                  — emotional state")
+    print("  projects               — list projects")
+    print("  life events            — list life events")
+    print("  episodes               — episodic memory")
+    print("  context                — recent context")
+    print("  clear context          — wipe context")
+    print("  quit / exit            — shut down")
+    print("=" * 40)
+
     print("Engine running")
 
     while True:
 
-        command = input("> ")
+        try:
+
+            command = input("> ")
+
+        except (KeyboardInterrupt, EOFError):
+
+            break
 
         print()
 
         if command.lower() in ["quit", "exit"]:
             break
 
+        if not command.strip():
+            continue
+
         event_bus.emit("user_input", command)
 
         print()
+
+    print("\nShutting down... Goodbye!")
 
 
 if __name__ == "__main__":
