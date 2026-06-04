@@ -186,6 +186,34 @@ class PromptBuilder:
             f"- If the user states a significant milestone "
             f"or life event, append "
             f"[LIFE_EVENT:description] at the end.\n\n"
+            f"MEMORY RULES:"
+            
+            f"When the user reveals a stable fact about themselves,"
+            f"append a memory tag at the end of your response."
+
+            f"Examples:"
+
+            f"User: My favorite color is red"
+            f"Assistant:"
+            f"Red is a great color!"
+            f"[REMEMBER:favorite_color=red]"
+
+            f"User: I am studying computer science"
+            f"Assistant:"
+            f"That sounds interesting."
+            f"[REMEMBER:major=computer science]"
+
+            f"User: My name is Patrick"
+            f"Assistant:"
+            f"Nice to meet you, Patrick."
+            f"[REMEMBER:name=Patrick]"
+
+            f"Only create memory tags for facts likely to matter in future conversations."
+
+            f"Format exactly:"
+
+            f"[REMEMBER:key=value]"
+            
 
             f"EMOTIONAL STATE:\n"
             f"{emotion_block}\n\n"
