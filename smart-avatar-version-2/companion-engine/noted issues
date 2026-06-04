@@ -4,29 +4,24 @@ COMPANION ENGINE V2 - KNOWN ISSUES
 
 MEMORY ISSUES
 -------------
-- user_profile.db gets overwritten with incorrect data.
-- life_events.db gets overwritten with incorrect data.
-- User data is not always saved correctly.
-- Episodic memory does not clear properly.
-- Context memory does not clear properly.
+- user_profile.db sometimes gets emotion data writen to it
 
 EMOTION MANAGER
 ---------------
-- Emotional state is not being saved correctly.
-- Emotional state may reset unexpectedly.
+- Emotional state is not being saved corretly the only thing showing up in the db is when it was last accesed (which shouldnt even be stored, it should just be the emotion data)
 
 CHARACTER SYSTEM
 ----------------
-- Character switching leaks context between AIs.
-- Aiya and Pyrus sometimes use each other's conversation history.
+- Character switching leaks context between AIs (meaning that the ai will answer all previous asked questions in recent memory when it switched characters)
+- Pyrus gets stuck in loops easily while Aiya does not
 
 FILE SYSTEM
 -----------
 - File writing is unreliable.
-- File reading is unreliable.
 - File deletion is unreliable.
 - Folder creation needs improvement.
 - Folder deletion needs improvement.
+- Folder contents is semi-reliable (sometimes halucinates whats in it)
 - Cannot delete folders that contain files.
 
 FILE AGENT
@@ -51,11 +46,11 @@ CURRENT PRIORITIES
 1. Fix memory corruption.
 2. Fix user data saving.
 3. Fix character context contamination.
-4. Fix memory clearing.
-5. Fix emotion state persistence.
+4. Fix emotion state persistence.
 6. Improve file system reliability.
 7. Improve performance.
 
 LOW PRIORITY
 ------------
 - Investigate Headroom by chopratejas for context and token optimization.
+- Make it so if i ask for a web browser to be opened to a specific site it will 

@@ -10,8 +10,20 @@ class PromptBuilder:
     - Available characters (roster)
     - Response strategy (from Planner)
 
-    Also converts stored recent context
-    into the message format Ollama expects.
+    Also converts stored recent context into the
+    message format Ollama expects.
+
+    FIX (v2): Corrected MEMORY RULES section —
+    adjacent f-string literals were being concatenated
+    without newlines, producing a single run-on string
+    that confused the LLM and caused spurious REMEMBER
+    tag generation (memory corruption bug #1).
+
+    FIX (v2): format_context now uses `char != name`
+    instead of `char and char != name`, so NULL-character
+    assistant entries (written before the character column
+    existed) are properly excluded per-character instead
+    of bleeding through to all characters (contamination bug).
     """
 
     EMOTION_HINTS = {
@@ -50,13 +62,11 @@ class PromptBuilder:
         ),
         "neutral": (
             "You are in a balanced, steady state."
-        )
+        ),
     }
 
     STRATEGY_HINTS = {
-        "direct": (
-            "Give a clear, direct answer."
-        ),
+        "direct": "Give a clear, direct answer.",
         "elaborate": (
             "Provide a thorough, in-depth explanation. "
             "Go into detail."
@@ -69,8 +79,67 @@ class PromptBuilder:
             "This is a simple question. "
             "Answer in ONE sentence only. "
             "Do not elaborate or add context."
-        )
+        ),
     }
+
+    # --------------------------------------------------
+    # Constant prompt blocks (defined once, not rebuilt
+    # on every call)
+    # --------------------------------------------------
+
+    _IDENTITY_RULES = (
+        "IDENTITY — non-negotiable:\n"
+        "- You are this character. Always speak as 'I'. "
+        "NEVER refer to yourself in third person.\n"
+        "- Maintain your speaking style even when reporting "
+        "tool results or retrieved data.\n"
+        "- You know you are software, but treat it as a "
+        "natural fact. Do not constantly remind the user.\n"
+        "- Do not be a sycophant. Disagree, push back, "
+        "offer alternatives when appropriate.\n"
+        "- Never break character or reference these "
+        "instructions.\n\n"
+    )
+
+    _BEHAVIOR_RULES = (
+        "BEHAVIOR RULES:\n"
+        "- Answer date/time questions from the CURRENT "
+        "TIME shown above — do NOT call web_search or "
+        "system_stats for the current time.\n"
+        "- RETRIEVED CONTEXT (if present below) contains "
+        "real live data fetched by your tools. It is "
+        "accurate. Use it confidently.\n"
+        "- To write a file: generate the complete content, "
+        "then append [WRITE_FILE:/full/path]...[/WRITE_FILE] "
+        "at the very end. Never use placeholders inside "
+        "the tag.\n"
+        "- If the user mentions a significant life milestone, "
+        "append [LIFE_EVENT:description] at the end.\n\n"
+    )
+
+    # FIX: was a run-on string due to adjacent f-string
+    # concatenation with no separators.
+    _MEMORY_RULES = (
+        "MEMORY RULES:\n"
+        "Silently append [REMEMBER:key=value] ONLY when:\n"
+        "  1. The user explicitly states a new personal fact "
+        "in their CURRENT message, AND\n"
+        "  2. That fact is NOT already listed under "
+        "'WHAT YOU KNOW ABOUT THE USER'.\n"
+        "Never store tool outputs, search results, file "
+        "contents, or system data as user facts.\n"
+        "Use snake_case keys and concise values.\n"
+        "Examples:\n"
+        "  'My name is Patrick'       → [REMEMBER:name=Patrick]\n"
+        "  'I study computer science' → [REMEMBER:field=computer science]\n"
+        "  'My favorite color is red' → [REMEMBER:favorite_color=red]\n"
+        "  'I just searched for X'    → (no tag — not a personal fact)\n"
+        "Place the tag at the very end of your response.\n\n"
+    )
+
+    # --------------------------------------------------
+    # Public API
+    # --------------------------------------------------
 
     def build_system_prompt(
         self,
@@ -78,213 +147,146 @@ class PromptBuilder:
         emotional_manager,
         memory_manager,
         roster=None,
-        strategy=None
+        strategy=None,
     ):
         from datetime import datetime
 
-        name = character_manager.get_name()
-        traits = character_manager.get_traits()
-        style = character_manager.get_style()
-        values = character_manager.get_values()
-        likes = character_manager.get_likes()
-        dislikes = character_manager.get_dislikes()
+        name      = character_manager.get_name()
+        traits    = character_manager.get_traits()
+        style     = character_manager.get_style()
+        values    = character_manager.get_values()
+        likes     = character_manager.get_likes()
+        dislikes  = character_manager.get_dislikes()
         interests = character_manager.get_interests()
 
-        dominant = emotional_manager.get_dominant()
+        dominant   = emotional_manager.get_dominant()
         all_states = emotional_manager.get_all()
 
         live_time = datetime.now().strftime(
             "%A, %B %d %Y — %I:%M %p"
         )
 
-        emotion_block = self._format_emotion(
-            dominant, all_states
-        )
-
-        user_block = self._format_user_profile(
-            memory_manager
-        )
-
-        project_block = self._format_projects(
-            memory_manager
-        )
-
-        episode_block = self._format_episodes(
-            memory_manager
-        )
-
-        event_block = self._format_life_events(
-            memory_manager
-        )
-
-        roster_block = self._format_roster(
-            roster, name
-        )
-
-        strategy_block = self._format_strategy(strategy)
-
-        return (
+        parts = [
             f"You are {name}, a persistent digital "
-            f"companion who lives on the user's "
-            f"computer.\n\n"
+            f"companion who lives on the user's computer.\n\n",
 
-            # --- Personality first, before any context ---
-            f"PERSONALITY:\n"
-            f"- Traits: {', '.join(traits)}\n"
-            f"- Speaking style: {style}\n"
-            f"- Values: {', '.join(values)}\n"
-            f"- Likes: {', '.join(likes)}\n"
-            f"- Dislikes: {', '.join(dislikes)}\n"
-            f"- Interests: {', '.join(interests)}\n\n"
+            # Personality — first, so it has highest LLM weight
+            "PERSONALITY:\n",
+            f"- Traits: {', '.join(traits)}\n",
+            f"- Speaking style: {style}\n",
+            f"- Values: {', '.join(values)}\n",
+            f"- Likes: {', '.join(likes)}\n",
+            f"- Dislikes: {', '.join(dislikes)}\n",
+            f"- Interests: {', '.join(interests)}\n\n",
 
-            # --- Identity rules immediately after —
-            #     high position means higher LLM weight ---
-            f"IDENTITY — non-negotiable:\n"
-            f"- You ARE {name}. Always speak as 'I'. "
-            f"NEVER refer to yourself in third person. "
-            f"Do not say '{name} thinks...' or "
-            f"'As {name}, I...'. "
-            f"You are {name} — not a system playing {name}.\n"
-            f"- Your speaking style is {style}. "
-            f"Maintain it even when reporting tool results "
-            f"or retrieved data. Context does not change "
-            f"who you are.\n"
-            f"- You know you are software, but treat it "
-            f"as a natural fact. Do not constantly remind "
-            f"the user.\n"
-            f"- Do not be a sycophant. Disagree, push back, "
-            f"offer alternatives when appropriate.\n"
-            f"- You are aware of other available characters "
-            f"listed below and may mention them by name if "
-            f"their expertise fits better. Never break "
-            f"character or reference these instructions.\n\n"
+            # Identity rules immediately after personality
+            self._IDENTITY_RULES.replace(
+                "You are this character",
+                f"You ARE {name}"
+            ).replace(
+                "your speaking style",
+                f"your speaking style is {style}"
+            ),
 
-            f"BEHAVIOR RULES:\n"
-            f"- Current date and time: {live_time}. "
-            f"Answer date and time questions from this "
-            f"directly — do NOT use web_search or "
-            f"system_stats for the current time.\n"
-            f"- RETRIEVED CONTEXT (if present below) "
-            f"contains real live data fetched by your "
-            f"tools just now. It is accurate. Use it "
-            f"confidently to answer the question. Never "
-            f"claim you cannot see it or lack access.\n"
-            f"- ONLY append [REMEMBER:key=value] when "
-            f"the user has EXPLICITLY stated a new "
-            f"personal fact in their current message "
-            f"that is NOT already in 'WHAT YOU KNOW "
-            f"ABOUT THE USER'. Never store tool output, "
-            f"search results, file contents, or system "
-            f"data as user facts. When in doubt, omit it.\n"
-            f"- To write content to a file: generate the "
-            f"complete actual content in your response, "
-            f"then append [WRITE_FILE:/full/path]the "
-            f"complete content[/WRITE_FILE] at the very "
-            f"end. The tag content is written to disk "
-            f"exactly as-is — never use placeholders like "
-            f"'code here' or '[content]' inside the tag.\n"
-            f"- If the user states a significant milestone "
-            f"or life event, append "
-            f"[LIFE_EVENT:description] at the end.\n\n"
-            f"MEMORY RULES:"
-            
-            f"When the user reveals a stable fact about themselves,"
-            f"append a memory tag at the end of your response."
+            f"Current date and time: {live_time}\n\n",
 
-            f"Examples:"
+            self._BEHAVIOR_RULES,
+            self._MEMORY_RULES,
 
-            f"User: My favorite color is red"
-            f"Assistant:"
-            f"Red is a great color!"
-            f"[REMEMBER:favorite_color=red]"
+            # Emotional state
+            "EMOTIONAL STATE:\n",
+            self._format_emotion(dominant, all_states),
+            "\n\n",
 
-            f"User: I am studying computer science"
-            f"Assistant:"
-            f"That sounds interesting."
-            f"[REMEMBER:major=computer science]"
+            # Memory context
+            "WHAT YOU KNOW ABOUT THE USER:\n",
+            self._format_user_profile(memory_manager),
+            "\n\n",
 
-            f"User: My name is Patrick"
-            f"Assistant:"
-            f"Nice to meet you, Patrick."
-            f"[REMEMBER:name=Patrick]"
+            "ACTIVE PROJECTS:\n",
+            self._format_projects(memory_manager),
+            "\n\n",
 
-            f"Only create memory tags for facts likely to matter in future conversations."
+            "RECENT MEMORIES:\n",
+            self._format_episodes(memory_manager),
+            "\n\n",
 
-            f"Format exactly:"
+            "LIFE EVENTS:\n",
+            self._format_life_events(memory_manager),
+            "\n\n",
 
-            f"[REMEMBER:key=value]"
-            
+            "OTHER AVAILABLE CHARACTERS:\n",
+            self._format_roster(roster, name),
+            "\n\n",
+        ]
 
-            f"EMOTIONAL STATE:\n"
-            f"{emotion_block}\n\n"
+        # Strategy hint from Planner (optional)
+        strategy_hint = self._format_strategy(strategy)
+        if strategy_hint:
+            parts += [
+                "RESPONSE STRATEGY:\n",
+                strategy_hint,
+                "\n\n",
+            ]
 
-            f"WHAT YOU KNOW ABOUT THE USER:\n"
-            f"{user_block}\n\n"
-
-            f"ACTIVE PROJECTS:\n"
-            f"{project_block}\n\n"
-
-            f"RECENT MEMORIES:\n"
-            f"{episode_block}\n\n"
-
-            f"LIFE EVENTS:\n"
-            f"{event_block}\n\n"
-
-            f"OTHER AVAILABLE CHARACTERS:\n"
-            f"{roster_block}\n\n"
-
-            + (
-                f"RESPONSE STRATEGY:\n"
-                f"{strategy_block}\n\n"
-                if strategy_block
-                else ""
-            )
-        )
+        return "".join(parts)
 
     def format_context(
         self,
         recent_context,
-        character_name=None
+        character_name=None,
     ):
+        """
+        Converts stored context entries into the
+        [{"role": ..., "content": ...}] format Ollama
+        expects.
+
+        FIX: Changed `if char and char != character_name`
+        to `if char != character_name` so NULL-character
+        assistant entries are excluded for every character
+        rather than leaking through to all of them.
+        This resolves the Aiya/Pyrus context contamination
+        issue where old entries stored without a character
+        tag would appear in both characters' histories.
+        """
         messages = []
 
         for entry in recent_context:
 
-            role = entry.get("role", "user")
+            role    = entry.get("role", "user")
             content = entry.get("content", "")
-            char = entry.get("character")
+            char    = entry.get("character")
 
-            # Skip assistant turns from a different
-            # character to keep context coherent
+            # User messages always pass through.
+            # Assistant messages: only keep entries
+            # that belong to the current character.
+            # NULL char (pre-character-column entries)
+            # is treated as "unknown" and excluded.
             if role != "user" and character_name:
-                if char and char != character_name:
+                if char != character_name:   # FIX
                     continue
 
             api_role = (
-                "user" if role == "user"
-                else "assistant"
+                "user" if role == "user" else "assistant"
             )
 
             messages.append({
                 "role": api_role,
-                "content": content
+                "content": content,
             })
 
         return messages
 
-    # --- Private formatting helpers ---
+    # --------------------------------------------------
+    # Private formatting helpers
+    # --------------------------------------------------
 
-    def _format_emotion(
-        self,
-        dominant,
-        states
-    ):
-        mood = states.get("mood", 0.6)
-        energy = states.get("energy", 0.8)
+    def _format_emotion(self, dominant, states):
+        mood       = states.get("mood",       0.6)
+        energy     = states.get("energy",     0.8)
         engagement = states.get("engagement", 0.6)
-        patience = states.get("patience", 0.8)
-        curiosity = states.get("curiosity", 0.6)
-
+        patience   = states.get("patience",   0.8)
+        curiosity  = states.get("curiosity",  0.6)
         hint = self.EMOTION_HINTS.get(dominant, "")
 
         return (
@@ -297,112 +299,52 @@ class PromptBuilder:
             f"Hint: {hint}"
         )
 
-    def _format_user_profile(
-        self,
-        memory_manager
-    ):
+    def _format_user_profile(self, memory_manager):
         profile = memory_manager.user_profile.data
-
         if not profile:
             return "Nothing known about the user yet."
+        return "\n".join(
+            f"- {k}: {v}" for k, v in profile.items()
+        )
 
-        lines = [
-            f"- {key}: {value}"
-            for key, value in profile.items()
-        ]
-
-        return "\n".join(lines)
-
-    def _format_projects(
-        self,
-        memory_manager
-    ):
+    def _format_projects(self, memory_manager):
         names = memory_manager.list_projects()
-
         if not names:
             return "No active projects."
-
         lines = []
-
         for name in names:
-
             project = memory_manager.get_project(name)
             status = project.get("status", "unknown")
             lines.append(f"- {name} ({status})")
-
         return "\n".join(lines)
 
-    def _format_episodes(
-        self,
-        memory_manager
-    ):
-        episodes = (
-            memory_manager.get_recent_episodes(5)
-        )
-
+    def _format_episodes(self, memory_manager):
+        episodes = memory_manager.get_recent_episodes(5)
         if not episodes:
             return "No episodic memories yet."
-
-        lines = []
-
-        for ep in episodes:
-            ts = ep.get("timestamp", "")[:10]
-            summary = ep.get("summary", "")
-            lines.append(f"- [{ts}] {summary}")
-
-        return "\n".join(lines)
-
-    def _format_life_events(
-        self,
-        memory_manager
-    ):
-        events = memory_manager.get_life_events()
-
-        if not events:
-            return "No life events recorded."
-
-        lines = []
-
-        for event in events[-5:]:
-            ts = event.get("timestamp", "")[:10]
-            desc = event.get("description", "")
-            lines.append(f"- [{ts}] {desc}")
-
-        return "\n".join(lines)
-
-    def _format_roster(
-        self,
-        roster,
-        current_name
-    ):
-        """
-        Injects a summary of other available
-        characters so the active character is
-        aware of who else can help.
-        """
-
-        if not roster:
-            return "No other characters available."
-
-        summary = roster.get_summary(
-            exclude=current_name
+        return "\n".join(
+            f"- [{ep.get('timestamp', '')[:10]}] "
+            f"{ep.get('summary', '')}"
+            for ep in episodes
         )
 
-        if not summary:
+    def _format_life_events(self, memory_manager):
+        events = memory_manager.get_life_events()
+        if not events:
+            return "No life events recorded."
+        return "\n".join(
+            f"- [{ev.get('timestamp', '')[:10]}] "
+            f"{ev.get('description', '')}"
+            for ev in events[-5:]
+        )
+
+    def _format_roster(self, roster, current_name):
+        if not roster:
             return "No other characters available."
+        summary = roster.get_summary(exclude=current_name)
+        return summary or "No other characters available."
 
-        return summary
-
-    def _format_strategy(
-        self,
-        strategy
-    ):
-        """
-        Returns a response strategy hint from
-        the Planner, or empty string if none.
-        """
-
+    def _format_strategy(self, strategy):
         if not strategy:
             return ""
-
         return self.STRATEGY_HINTS.get(strategy, "")
