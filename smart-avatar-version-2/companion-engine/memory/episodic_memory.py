@@ -1,4 +1,4 @@
-import json
+import sqlite3
 import os
 from datetime import datetime
 
@@ -7,72 +7,58 @@ class EpisodicMemory:
 
     def __init__(self):
 
-        self.file_path = (
-            "data/memory/episodes.json"
+        self.db_path = (
+            "data/memory/episodes.db"
         )
 
-        self.episodes = []
+        os.makedirs(
+            os.path.dirname(self.db_path),
+            exist_ok=True
+        )
 
-        self.load()
+        self._db = sqlite3.connect(
+            self.db_path,
+            check_same_thread=False
+        )
+        self._db.execute("PRAGMA journal_mode=WAL")
+        self._db.execute("PRAGMA synchronous=NORMAL")
 
-    def load(self):
+        self._init_db()
 
-        if os.path.exists(
-            self.file_path
-        ):
+    def _init_db(self):
 
-            try:
-
-                with open(
-                    self.file_path,
-                    "r"
-                ) as f:
-
-                    content = f.read().strip()
-
-                    if content:
-
-                        self.episodes = (
-                            json.loads(content)
-                        )
-
-            except Exception:
-
-                self.episodes = []
-
-    def save(self):
-
-        with open(
-            self.file_path,
-            "w"
-        ) as f:
-
-            json.dump(
-                self.episodes,
-                f,
-                indent=4
+        self._db.execute("""
+            CREATE TABLE IF NOT EXISTS episodes (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT    NOT NULL,
+                summary   TEXT    NOT NULL
             )
+        """)
+        self._db.commit()
 
-    def add_episode(
-        self,
-        summary
-    ):
+    def add_episode(self, summary):
 
-        self.episodes.append(
-            {
-                "timestamp":
-                datetime.now().isoformat(),
-
-                "summary":
-                summary
-            }
+        self._db.execute(
+            "INSERT INTO episodes (timestamp, summary) "
+            "VALUES (?, ?)",
+            (datetime.now().isoformat(), summary)
         )
+        self._db.commit()
 
-        self.save()
+    def get_recent(self, count=10):
 
-    def get_recent(
-        self,
-        count=10
-    ):
+        rows = self._db.execute(
+            "SELECT timestamp, summary FROM episodes "
+            "ORDER BY id DESC LIMIT ?",
+            (count,)
+        ).fetchall()
 
-        return self.episodes[-count:]
+        return [
+            {"timestamp": ts, "summary": s}
+            for ts, s in reversed(rows)
+        ]
+
+    def clear(self):
+
+        self._db.execute("DELETE FROM episodes")
+        self._db.commit()

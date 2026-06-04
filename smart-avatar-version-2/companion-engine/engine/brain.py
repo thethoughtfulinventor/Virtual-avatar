@@ -13,6 +13,26 @@ from engine.planner import Planner
 from llm.model_config import ModelConfig
 
 
+# Intents that are pure system commands —
+# no LLM call needed, no context added.
+# main.py handles the action after process() returns.
+_SYSTEM_INTENTS = {
+    "context_clear",
+    "context_view",
+    "episode_clear",
+    "episode_list",
+    "episode_create",
+    "projects_list",
+    "project_create",
+    "project_lookup",
+    "life_events_list",
+    "life_event_create",
+    "state_view",
+    "memory_store",
+    "memory_recall",
+}
+
+
 class Brain:
 
     def __init__(
@@ -58,16 +78,12 @@ class Brain:
 
         self.summarizer = Summarizer(self.llm_client)
 
-        # Phase 7: skill registry and executor
         self.tool_registry = ToolRegistry()
 
         self.plan_executor = PlanExecutor(
             self.tool_registry
         )
 
-        # Planner now receives the tool registry
-        # so it can include available skills in
-        # its planning prompt.
         self.planner = Planner(
             self.llm_client,
             roster,
@@ -125,8 +141,26 @@ class Brain:
 
         memory = self.service_manager.get("memory")
 
+        # Route character switches immediately
         if intent == "switch_character":
             return self._handle_switch(text, memory)
+
+        # System commands: skip LLM entirely.
+        # These are instant storage/retrieval ops
+        # handled by main.py after we return.
+        # Bypassing the LLM for these saves a full
+        # round-trip per command (5–30 s on local models).
+        if intent in _SYSTEM_INTENTS:
+            return {
+                "intent": intent,
+                "response": "",
+                "memories": [],
+                "emotional_state": (
+                    self.emotional_manager.get_dominant()
+                ),
+                "character_switched": False,
+                "new_character": None
+            }
 
         memories = (
             self.memory_retriever.retrieve(text)
@@ -141,9 +175,6 @@ class Brain:
 
         character_switched = False
 
-        # Phase 6+7: run planner for all conversation
-        # turns when enabled — now also handles
-        # tool selection regardless of character count.
         if (
             intent == "conversation"
             and ModelConfig.ENABLE_PLANNER
@@ -172,9 +203,7 @@ class Brain:
                         f"{canonical}: {plan['reason']}"
                     )
 
-        # Phase 7: execute any tools the planner
-        # requested, then inject results into the
-        # system prompt before the main LLM call.
+        # Execute any tools the planner requested
         retrieved_context = ""
 
         if plan.get("tools_needed"):
@@ -209,8 +238,6 @@ class Brain:
             )
         )
 
-        # Inject tool results so the LLM answers
-        # with real data, not hallucinated facts.
         if retrieved_context:
             system_prompt += (
                 f"\n\nRETRIEVED CONTEXT:\n"
@@ -249,14 +276,11 @@ class Brain:
             system_prompt, messages
         )
 
+        # Extract facts and response actions once each
+        # (previously called _extract_and_store_facts twice)
         response = self._extract_and_store_facts(
             response, memory
         )
-
-        response = self._extract_and_store_facts(
-            response, memory
-        )
-        # Add this line in both places:
         response = self._extract_response_actions(
             response, memory
         )
@@ -288,43 +312,23 @@ class Brain:
 
         self._compress_context(memory)
 
-        if character_switched:
-            name = self.character_manager.get_name()
-
-            user_content = (
-                f"{text}\n"
-                f"[You ({name}) were just routed in to "
-                f"handle this specific message. "
-                f"Respond ONLY to what the user just said "
-                f"above. Do not address or answer any "
-                f"earlier questions from the context "
-                f"history. The switch is done.]"
-            )
-
-            new_character = name
-        else:
-            user_content = text
-            new_character = None
-
         return {
             "intent": intent,
             "response": response,
             "memories": memories,
             "emotional_state": dominant,
             "character_switched": character_switched,
-            "new_character": new_character
+            "new_character": (
+                self.character_manager.get_name()
+                if character_switched else None
+            )
         }
-    
+
     # --------------------------------------------------
     # Internal helpers
     # --------------------------------------------------
 
     def _execute_tools(self, tools_needed, memory):
-        """
-        Converts the planner's tools_needed list
-        into a Plan, runs it through PlanExecutor,
-        and returns the formatted results string.
-        """
 
         if not tools_needed:
             return ""
@@ -412,7 +416,6 @@ class Brain:
             canonical
         )
 
-        # Replace with this:
         messages.append({
             "role": "user",
             "content": (
@@ -467,7 +470,6 @@ class Brain:
             "said", "current", "active", "character",
             "action", "command", "message", "response",
             "user_request", "context", "intent",
-            # Phase 7 additions — never store tool output
             "search", "result", "file", "path", "folder",
             "directory", "system", "cpu", "ram", "gpu",
             "storage", "terminal", "process", "output",
@@ -531,13 +533,11 @@ class Brain:
 
     def _compress_context(self, memory):
 
-        entries = memory.recent_context.get_recent(25)
-
-        if len(entries) < 25:
+        if memory.recent_context.count() < 25:
             return
 
+        entries = memory.recent_context.get_recent(25)
         summary = self.summarizer.summarize(entries)
-
         memory.compress_context(summary)
 
         if summary:
@@ -549,12 +549,6 @@ class Brain:
     def _extract_response_actions(
         self, response, memory
     ):
-        """
-        Extracts and executes [WRITE_FILE:path]
-        content[/WRITE_FILE] tags from the LLM
-        response, then strips them from the
-        displayed text.
-        """
         import re
 
         if not response:

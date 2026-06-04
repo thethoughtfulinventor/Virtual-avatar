@@ -36,10 +36,7 @@ def select_character(available):
 
     print("\nAvailable characters:")
 
-    for i, name in enumerate(
-        available, 1
-    ):
-
+    for i, name in enumerate(available, 1):
         print(f"  {i}. {name}")
 
     while True:
@@ -53,11 +50,9 @@ def select_character(available):
             index = int(choice) - 1
 
             if 0 <= index < len(available):
-
                 return available[index]
 
         if choice in available:
-
             return choice
 
         print(
@@ -91,7 +86,10 @@ def on_user_input(text):
             f"{result['new_character']}"
         )
 
-    print(f"{current_name}: {result['response']}")
+    # System intents return an empty response string —
+    # only print when the LLM actually produced output
+    if result["response"]:
+        print(f"{current_name}: {result['response']}")
 
     if intent == "switch_character":
         return
@@ -100,10 +98,7 @@ def on_user_input(text):
 
         try:
 
-            key_value = text.replace(
-                "remember ", ""
-            )
-
+            key_value = text.replace("remember ", "")
             key, value = key_value.split("=", 1)
 
             memory.remember(
@@ -114,19 +109,14 @@ def on_user_input(text):
             print(f"Stored: {key.strip()}")
 
         except ValueError:
-
             print("Usage: remember key=value")
 
         return
 
     if intent == "memory_recall":
 
-        key = text.replace(
-            "recall ", ""
-        ).strip()
-
+        key = text.replace("recall ", "").strip()
         value = memory.recall(key)
-
         print(f"Memory: {value}")
 
         return
@@ -138,7 +128,6 @@ def on_user_input(text):
         ).strip()
 
         memory.create_project(project_name)
-
         print(f"Created project: {project_name}")
 
         return
@@ -171,12 +160,8 @@ def on_user_input(text):
 
     if intent == "episode_create":
 
-        summary = text.replace(
-            "episode ", ""
-        ).strip()
-
+        summary = text.replace("episode ", "").strip()
         memory.add_episode(summary)
-
         print("Episode stored.")
 
         return
@@ -208,16 +193,15 @@ def on_user_input(text):
     if intent == "context_clear":
 
         memory.recent_context.clear()
-
         print("Context cleared.")
 
         return
-    
+
     if intent == "episode_clear":
 
-        memory.episodic_memory.episodes = []
-        memory.episodic_memory.save()
-
+        # clear() is the proper SQL-backed method;
+        # avoids the old direct .episodes = [] hack
+        memory.episodic_memory.clear()
         print("Episodic memory cleared.")
 
         return
@@ -229,7 +213,6 @@ def on_user_input(text):
         ).strip()
 
         memory.add_life_event(description)
-
         print("Life event stored.")
 
         return
@@ -277,15 +260,12 @@ def main():
     print("=" * 40)
 
     state_manager = StateManager()
-
     event_bus = EventBus()
 
     global service_manager
-
     service_manager = ServiceManager()
 
     plugin_manager = PluginManager()
-
     memory_manager = MemoryManager()
 
     service_manager.register(
@@ -304,7 +284,6 @@ def main():
     )
 
     roster = CharacterRoster("characters")
-
     available = roster.get_names()
 
     print(
@@ -312,15 +291,8 @@ def main():
         f"{', '.join(available)}"
     )
 
-    event_bus.subscribe(
-        "engine_started",
-        on_engine_started
-    )
-
-    event_bus.subscribe(
-        "user_input",
-        on_user_input
-    )
+    event_bus.subscribe("engine_started", on_engine_started)
+    event_bus.subscribe("user_input", on_user_input)
 
     selected = select_character(available)
 
@@ -330,10 +302,7 @@ def main():
         f"characters/{selected}"
     )
 
-    state_manager.set(
-        "active_character",
-        character
-    )
+    state_manager.set("active_character", character)
 
     print(f"Loaded Character: {character['name']}")
 
@@ -345,12 +314,8 @@ def main():
     )
 
     global brain_instance
-
     brain_instance = brain
 
-    # Phase 7: register all skills into Brain's
-    # tool registry. Skills become available to
-    # the Planner and PlanExecutor automatically.
     from skills.registry import register_skills
     register_skills(brain.tool_registry)
 
@@ -378,11 +343,8 @@ def main():
     while True:
 
         try:
-
             command = input("> ")
-
         except (KeyboardInterrupt, EOFError):
-
             break
 
         print()
@@ -394,7 +356,6 @@ def main():
             continue
 
         event_bus.emit("user_input", command)
-
         print()
 
     print("\nShutting down... Goodbye!")

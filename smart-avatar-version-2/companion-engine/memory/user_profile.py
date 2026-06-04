@@ -1,4 +1,4 @@
-import json
+import sqlite3
 import os
 
 
@@ -6,84 +6,68 @@ class UserProfile:
 
     def __init__(self):
 
-        self.file_path = (
-            "data/memory/user_profile.json"
+        self.db_path = (
+            "data/memory/user_profile.db"
         )
 
         self.data = {}
 
-        self.load()
+        os.makedirs(
+            os.path.dirname(self.db_path),
+            exist_ok=True
+        )
 
-    def load(self):
-    
-        if os.path.exists(
-        	self.file_path
-        ):
-        
-            try:
-            
-                with open(
-                	self.file_path,
-                	 "r"
-                ) as f:
-                
-                    content = f.read().strip()
-                    
-                    if content:
-                    
-                        self.data = json.loads(
-                        	content
-                        )
-                        
-                    else:
-                    
-                        self.data = {}
-                        
-            except Exception:
-            
-                self.data = {}
-                
-        else:
-        
-            self.data = {}   
+        self._db = sqlite3.connect(
+            self.db_path,
+            check_same_thread=False
+        )
+        self._db.execute("PRAGMA journal_mode=WAL")
+        self._db.execute("PRAGMA synchronous=NORMAL")
 
-    def save(self):
+        self._init_db()
+        self._load()
 
-        with open(
-            self.file_path,
-            "w"
-        ) as f:
+    def _init_db(self):
 
-            json.dump(
-                self.data,
-                f,
-                indent=4
+        self._db.execute("""
+            CREATE TABLE IF NOT EXISTS profile (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
             )
+        """)
+        self._db.commit()
 
-    def set_fact(
-        self,
-        key,
-        value
-    ):
+    def _load(self):
+
+        rows = self._db.execute(
+            "SELECT key, value FROM profile"
+        ).fetchall()
+
+        self.data = {k: v for k, v in rows}
+
+    def set_fact(self, key, value):
 
         self.data[key] = value
 
-        self.save()
+        self._db.execute(
+            "INSERT OR REPLACE INTO profile "
+            "(key, value) VALUES (?, ?)",
+            (key, value)
+        )
+        self._db.commit()
 
-    def get_fact(
-        self,
-        key
-    ):
+    def get_fact(self, key):
 
         return self.data.get(key)
 
-    def remove_fact(
-        self,
-        key
-    ):
+    def remove_fact(self, key):
 
         if key in self.data:
 
             del self.data[key]
 
-            self.save()
+            self._db.execute(
+                "DELETE FROM profile WHERE key = ?",
+                (key,)
+            )
+            self._db.commit()

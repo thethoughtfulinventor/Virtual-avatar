@@ -7,11 +7,14 @@ cannot open terminal (cant find it)
 both AIs answer most questions asked previously in recent context after switching personalities
 both had a hard time adding specifics to files for example i asked pyrus to write some code, which he did, then i asked him to save it to a already existing file he made, which he didint and instead made a new file with a similar name in the same folder and filled it with "python code here" then claimed that he wrote it
 does not clear context when asked to, same for episodic memory
-
-
+does not appear to be using cuda
+is not saving user data and instead saves other data to the db
+bug in the emotion manager -> emotion state is not properly saved
 
 
 ---to do before we get any further:
-	switch from .json for storing info to sql
+	speed up processing time
 	fix all bugs
 	
+--things to look into (low to no prority):
+	look into how chopratejas/headroom could improve token usage

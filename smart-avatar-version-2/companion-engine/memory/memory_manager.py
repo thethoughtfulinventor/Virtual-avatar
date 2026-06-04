@@ -4,6 +4,7 @@ from memory.episodic_memory import EpisodicMemory
 from memory.recent_context import RecentContext
 from memory.life_events import LifeEvents
 
+
 class MemoryManager:
 
     def __init__(self):
@@ -13,10 +14,10 @@ class MemoryManager:
         self.project_manager = (
             ProjectManager()
         )
-        
+
         self.episodic_memory = (
-    		EpisodicMemory()
-	    )
+            EpisodicMemory()
+        )
 
         self.life_events = (
             LifeEvents()
@@ -24,107 +25,72 @@ class MemoryManager:
 
         self.recent_context = (
             RecentContext()
-        )  
+        )
 
+    # --------------------------------------------------
     # User Profile Memory
+    # --------------------------------------------------
 
-    def remember(
-        self,
-        key,
-        value
-    ):
+    def remember(self, key, value):
 
-        self.user_profile.set_fact(
-            key,
-            value
-        )
+        self.user_profile.set_fact(key, value)
 
-    def recall(
-        self,
-        key
-    ):
+    def recall(self, key):
 
-        return self.user_profile.get_fact(
-            key
-        )
+        return self.user_profile.get_fact(key)
 
+    # --------------------------------------------------
     # Project Memory
+    # --------------------------------------------------
 
-    def create_project(
-        self,
-        name
-    ):
+    def create_project(self, name):
 
-        self.project_manager.create_project(
-            name
-        )
+        self.project_manager.create_project(name)
 
-    def get_project(
-        self,
-        name
-    ):
+    def get_project(self, name):
 
-        return self.project_manager.get_project(
-            name
-        )
+        return self.project_manager.get_project(name)
 
-    def list_projects(
-        self
-    ):
+    def list_projects(self):
 
-        return (
-            self.project_manager
-            .list_projects()
-        )
-    
-    def add_episode(
-        self,
-        summary
-    ):
+        return self.project_manager.list_projects()
 
-        self.episodic_memory.add_episode(
-            summary
-        )
+    # --------------------------------------------------
+    # Episodic Memory
+    # --------------------------------------------------
 
+    def add_episode(self, summary):
 
-    def get_recent_episodes(
-        self,
-        count=10
-    ):
+        self.episodic_memory.add_episode(summary)
 
-        return (
-            self.episodic_memory
-            .get_recent(count)
-        )
-    
-    def add_context(
-        self,
-        role,
-        content,
-        character=None
-    ):
- 
-        self.recent_context.add(
-            role,
-            content,
-            character
-        )
- 
+    def get_recent_episodes(self, count=10):
 
+        return self.episodic_memory.get_recent(count)
 
-    def get_recent_context(
-        self,
-        count=50
-    ):
+    # --------------------------------------------------
+    # Recent Context
+    # --------------------------------------------------
 
-        return (
-            self.recent_context
-            .get_recent(count)
-        )
+    def add_context(self, role, content, character=None):
 
-    # New — accepts a pre-generated summary,
-    # returns the entries if compression ran
+        self.recent_context.add(role, content, character)
+
+    def get_recent_context(self, count=50):
+
+        return self.recent_context.get_recent(count)
+
     def compress_context(self, summary=None):
+        """
+        Stores the provided summary as an episode,
+        then trims recent context to the last 3 entries.
+
+        Uses keep_last() instead of direct .entries
+        manipulation so this works with both SQL and
+        any future backend.
+
+        Returns the entries that were summarized,
+        or None if context was too short to compress.
+        """
 
         entries = self.recent_context.get_recent(25)
 
@@ -134,28 +100,18 @@ class MemoryManager:
         if summary:
             self.add_episode(summary)
 
-        self.recent_context.entries = (
-            self.recent_context.entries[-3:]
-        )
-
-        self.recent_context.save()
+        self.recent_context.keep_last(3)
 
         return entries
-    
-    def add_life_event(
-        self,
-        description
-    ):
 
-        self.life_events.add_event(
-            description
-        )
+    # --------------------------------------------------
+    # Life Events
+    # --------------------------------------------------
 
+    def add_life_event(self, description):
 
-    def get_life_events(
-        self
-    ):
+        self.life_events.add_event(description)
 
-        return (
-            self.life_events.get_events()
-        )
+    def get_life_events(self):
+
+        return self.life_events.get_events()
