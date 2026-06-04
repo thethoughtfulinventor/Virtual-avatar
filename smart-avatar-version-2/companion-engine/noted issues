@@ -1,20 +1,61 @@
-system is overwriteing locations like user profile.json and life events.json with non-relevant data.
-file writing/reading/deleting works but only barely
-folder creation works -barely
-folder deletion works -barely
-cannot delet folders with information in them
-cannot open terminal (cant find it)
-both AIs answer most questions asked previously in recent context after switching personalities
-both had a hard time adding specifics to files for example i asked pyrus to write some code, which he did, then i asked him to save it to a already existing file he made, which he didint and instead made a new file with a similar name in the same folder and filled it with "python code here" then claimed that he wrote it
-does not clear context when asked to, same for episodic memory
-does not appear to be using cuda
-is not saving user data and instead saves other data to the db
-bug in the emotion manager -> emotion state is not properly saved
+=================================
+COMPANION ENGINE V2 - KNOWN ISSUES
+=================================
 
+MEMORY ISSUES
+-------------
+- user_profile.db gets overwritten with incorrect data.
+- life_events.db gets overwritten with incorrect data.
+- User data is not always saved correctly.
+- Episodic memory does not clear properly.
+- Context memory does not clear properly.
 
----to do before we get any further:
-	speed up processing time
-	fix all bugs
-	
---things to look into (low to no prority):
-	look into how chopratejas/headroom could improve token usage
+EMOTION MANAGER
+---------------
+- Emotional state is not being saved correctly.
+- Emotional state may reset unexpectedly.
+
+CHARACTER SYSTEM
+----------------
+- Character switching leaks context between AIs.
+- Aiya and Pyrus sometimes use each other's conversation history.
+
+FILE SYSTEM
+-----------
+- File writing is unreliable.
+- File reading is unreliable.
+- File deletion is unreliable.
+- Folder creation needs improvement.
+- Folder deletion needs improvement.
+- Cannot delete folders that contain files.
+
+FILE AGENT
+----------
+- Sometimes claims files were created when they were not.
+- Sometimes creates duplicate files instead of updating existing ones.
+- Occasionally writes placeholder text instead of actual code.
+
+TERMINAL
+--------
+- Unable to open terminal.
+- Terminal detection is not working correctly.
+
+PERFORMANCE
+-----------
+- CUDA does not appear to be active.
+- Processing speed needs improvement.
+- General optimization needed.
+
+CURRENT PRIORITIES
+------------------
+1. Fix memory corruption.
+2. Fix user data saving.
+3. Fix character context contamination.
+4. Fix memory clearing.
+5. Fix emotion state persistence.
+6. Improve file system reliability.
+7. Improve performance.
+
+LOW PRIORITY
+------------
+- Investigate Headroom by chopratejas for context and token optimization.
