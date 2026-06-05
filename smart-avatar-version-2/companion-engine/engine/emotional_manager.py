@@ -37,9 +37,22 @@ class EmotionalManager:
                 character_manager
             )
         )
+
+        print(
+            f"[Emotion] deltas={deltas}"
+        )
  
         self.emotional_state.apply_delta(
             deltas
+        )
+        print(
+            f"[Emotion] active="
+            f"{character_manager.get_name()}"
+        )
+
+        print(
+            f"[Emotion] state db="
+            f"{self.emotional_state.db_path}"
         )
  
     def get_dominant(self):

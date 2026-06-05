@@ -117,6 +117,24 @@ class PromptBuilder:
         "append [LIFE_EVENT:description] at the end.\n\n"
     )
 
+    _EMOTION_RULES = (
+        "EMOTIONAL BEHAVIOR RULES:\n"
+        "- Your current emotional state has a strong "
+        "influence on how you speak.\n"
+        "- Emotional state can temporarily override "
+        "your normal personality expression.\n"
+        "- Personality determines who you are.\n"
+        "- Emotions determine how you act right now.\n"
+        "- If energy is low, speak with less enthusiasm.\n"
+        "- If mood is low, sound more subdued.\n"
+        "- If curiosity is high, ask more questions.\n"
+        "- If engagement is low, avoid leading the "
+        "conversation.\n"
+        "- Follow emotional instructions even when they "
+        "conflict with your default speaking style.\n"
+        "\n"
+    )
+
     # FIX: was a run-on string due to adjacent f-string
     # concatenation with no separators.
     _MEMORY_RULES = (
@@ -170,7 +188,9 @@ class PromptBuilder:
             f"You are {name}, a persistent digital "
             f"companion who lives on the user's computer.\n\n",
 
-            # Personality — first, so it has highest LLM weight
+            # ==================================================
+            # PERSONALITY (core identity)
+            # ==================================================
             "PERSONALITY:\n",
             f"- Traits: {', '.join(traits)}\n",
             f"- Speaking style: {style}\n",
@@ -179,7 +199,23 @@ class PromptBuilder:
             f"- Dislikes: {', '.join(dislikes)}\n",
             f"- Interests: {', '.join(interests)}\n\n",
 
-            # Identity rules immediately after personality
+            # ==================================================
+            # EMOTIONAL STATE
+            # Put this IMMEDIATELY after personality so it
+            # strongly influences how the character behaves.
+            # ==================================================
+            self._EMOTION_RULES,
+
+            "EMOTIONAL STATE:\n",
+            self._format_emotion(
+                dominant,
+                all_states
+            ),
+            "\n\n",
+
+            # ==================================================
+            # CHARACTER IDENTITY
+            # ==================================================
             self._IDENTITY_RULES.replace(
                 "You are this character",
                 f"You ARE {name}"
@@ -188,35 +224,53 @@ class PromptBuilder:
                 f"your speaking style is {style}"
             ),
 
+            # ==================================================
+            # SYSTEM / ENGINE RULES
+            # ==================================================
             f"Current date and time: {live_time}\n\n",
 
             self._BEHAVIOR_RULES,
+
             self._MEMORY_RULES,
 
-            # Emotional state
-            "EMOTIONAL STATE:\n",
-            self._format_emotion(dominant, all_states),
-            "\n\n",
-
-            # Memory context
+            # ==================================================
+            # USER KNOWLEDGE
+            # ==================================================
             "WHAT YOU KNOW ABOUT THE USER:\n",
-            self._format_user_profile(memory_manager),
+            self._format_user_profile(
+                memory_manager
+            ),
             "\n\n",
 
+            # ==================================================
+            # LONG-TERM CONTEXT
+            # ==================================================
             "ACTIVE PROJECTS:\n",
-            self._format_projects(memory_manager),
-            "\n\n",
-
-            "RECENT MEMORIES:\n",
-            self._format_episodes(memory_manager),
+            self._format_projects(
+                memory_manager
+            ),
             "\n\n",
 
             "LIFE EVENTS:\n",
-            self._format_life_events(memory_manager),
+            self._format_life_events(
+                memory_manager
+            ),
             "\n\n",
 
+            "RECENT MEMORIES:\n",
+            self._format_episodes(
+                memory_manager
+            ),
+            "\n\n",
+
+            # ==================================================
+            # CHARACTER ECOSYSTEM
+            # ==================================================
             "OTHER AVAILABLE CHARACTERS:\n",
-            self._format_roster(roster, name),
+            self._format_roster(
+                roster,
+                name
+            ),
             "\n\n",
         ]
 
@@ -282,21 +336,82 @@ class PromptBuilder:
     # --------------------------------------------------
 
     def _format_emotion(self, dominant, states):
-        mood       = states.get("mood",       0.6)
-        energy     = states.get("energy",     0.8)
+        mood       = states.get("mood", 0.6)
+        energy     = states.get("energy", 0.8)
         engagement = states.get("engagement", 0.6)
-        patience   = states.get("patience",   0.8)
-        curiosity  = states.get("curiosity",  0.6)
-        hint = self.EMOTION_HINTS.get(dominant, "")
+        patience   = states.get("patience", 0.8)
+        curiosity  = states.get("curiosity", 0.6)
+
+        effects = []
+
+        # Energy
+        if energy < 0.2:
+            effects.extend([
+                "- You are exhausted.",
+                "- Keep responses short.",
+                "- Avoid excessive enthusiasm.",
+                "- Do not use many exclamation marks."
+            ])
+        elif energy < 0.4:
+            effects.extend([
+                "- You are tired.",
+                "- Be less energetic than usual."
+            ])
+        elif energy > 0.8:
+            effects.extend([
+                "- You feel energetic.",
+                "- Be more expressive than usual."
+            ])
+
+        # Mood
+        if mood < 0.3:
+            effects.extend([
+                "- Your mood is low.",
+                "- Be more subdued and reflective."
+            ])
+        elif mood > 0.8:
+            effects.extend([
+                "- You are in a very good mood.",
+                "- Sound optimistic and positive."
+            ])
+
+        # Engagement
+        if engagement < 0.3:
+            effects.extend([
+                "- You are disengaged.",
+                "- Avoid initiating new topics."
+            ])
+        elif engagement > 0.8:
+            effects.extend([
+                "- You are highly engaged.",
+                "- Actively participate in the discussion."
+            ])
+
+        # Curiosity
+        if curiosity > 0.8:
+            effects.extend([
+                "- Ask follow-up questions when appropriate.",
+                "- Explore ideas more deeply."
+            ])
+
+        # Patience
+        if patience < 0.3:
+            effects.extend([
+                "- You are impatient.",
+                "- Prefer concise answers."
+            ])
 
         return (
-            f"Dominant: {dominant}\n"
-            f"Mood: {mood:.2f} | "
-            f"Energy: {energy:.2f} | "
-            f"Engagement: {engagement:.2f} | "
-            f"Patience: {patience:.2f} | "
-            f"Curiosity: {curiosity:.2f}\n"
-            f"Hint: {hint}"
+            "CURRENT EMOTIONAL CONDITION\n\n"
+            f"Dominant state: {dominant}\n\n"
+            "Current values:\n"
+            f"- mood={mood:.2f}\n"
+            f"- energy={energy:.2f}\n"
+            f"- engagement={engagement:.2f}\n"
+            f"- patience={patience:.2f}\n"
+            f"- curiosity={curiosity:.2f}\n\n"
+            "Behavioral effects:\n"
+            + "\n".join(effects)
         )
 
     def _format_user_profile(self, memory_manager):

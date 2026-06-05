@@ -41,10 +41,10 @@ class Planner:
     """
 
     def plan(
-    self,
-    text,
-    current_character,
-    recent_context=None
+        self,
+        text,
+        current_character,
+        recent_context=None
     ):
 
         text = text.strip()
@@ -97,14 +97,8 @@ class Planner:
             app = launch.group(2).strip()
 
             return {
-                "best_character": (
-                    "Pyrus"
-                    if current_character.get_name()
-                    != "Pyrus"
-                    else None
-                ),
-                "reason":
-                    "Application launching task.",
+                "best_character": None,
+                "reason": "",
                 "response_strategy":
                     "direct",
                 "tools_needed": [

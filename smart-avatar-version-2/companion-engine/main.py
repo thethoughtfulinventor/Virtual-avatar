@@ -7,6 +7,7 @@ from engine.plugin_manager import PluginManager
 from engine.character_loader import CharacterLoader
 from engine.character_roster import CharacterRoster
 from engine.brain import Brain
+from engine.cuda_manager import CudaManager       # Phase 8 prep
 
 from memory.memory_manager import MemoryManager
 
@@ -259,6 +260,15 @@ def main():
     print("Character CORE ENGINE")
     print("=" * 40)
 
+    # --------------------------------------------------
+    # CUDA detection — must run before Brain/OllamaClient
+    # so that CUDA_VISIBLE_DEVICES is set before the
+    # first HTTP connection to Ollama is made.
+    # --------------------------------------------------
+    cuda_manager = CudaManager()
+    cuda_manager.print_status()
+    print("-" * 40)
+
     state_manager = StateManager()
     event_bus = EventBus()
 
@@ -271,6 +281,14 @@ def main():
     service_manager.register(
         "memory",
         memory_manager
+    )
+
+    # Register cuda_manager so subsystems (system_skill,
+    # future avatar/initiative) can access GPU state without
+    # spawning additional subprocesses.
+    service_manager.register(
+        "cuda",
+        cuda_manager
     )
 
     context_count = len(

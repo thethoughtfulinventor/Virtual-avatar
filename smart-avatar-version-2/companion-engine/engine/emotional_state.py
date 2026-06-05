@@ -43,6 +43,11 @@ class EmotionalState:
             character_dir, "emotional_state.db"
         )
 
+        print(
+            "[Emotion ABSOLUTE]",
+            os.path.abspath(self.db_path)
+        )
+
         self._db = sqlite3.connect(
             self.db_path, check_same_thread=False
         )
@@ -90,7 +95,18 @@ class EmotionalState:
         ).fetchone()
         self.last_saved = meta[0] if meta else None
 
-        self._apply_time_decay()
+        print(
+            f"[Emotion LOAD] "
+            f"{self.db_path}"
+        )
+
+        print(
+            f"[Emotion LOAD STATE] "
+            f"{self.state}"
+        )
+
+        self._apply_time_based_recovery()
+        self.save()  # important: persist recovered state immediately
 
     def _apply_time_decay(self):
         """
@@ -131,7 +147,16 @@ class EmotionalState:
     # --------------------------------------------------
 
     def save(self):
+        print(
+            f"[Emotion SAVE] "
+            f"{self.db_path}"
+        )
+        print(
+            f"[Emotion SAVE STATE] "
+            f"{self.state}"
+        )
         now = datetime.now().isoformat()
+        self._apply_time_based_recovery()
         self.last_saved = now
 
         for key, value in self.state.items():
@@ -145,17 +170,37 @@ class EmotionalState:
             (now,),
         )
         self._db.commit()
+        rows = self._db.execute(
+            "SELECT key, value FROM state"
+        ).fetchall()
+
+        print("[Emotion VERIFY]", rows)
 
     # --------------------------------------------------
     # State mutation
     # --------------------------------------------------
 
     def apply_delta(self, deltas: dict):
+
+        print(
+            f"[Emotion BEFORE] "
+            f"{self.db_path} "
+            f"{self.state}"
+        )
+
         for key, delta in deltas.items():
             if key in self.state:
                 self.state[key] = max(
-                    0.0, min(1.0, self.state[key] + delta)
+                    0.0,
+                    min(1.0, self.state[key] + delta)
                 )
+
+        print(
+            f"[Emotion AFTER] "
+            f"{self.db_path} "
+            f"{self.state}"
+        )
+
         self.save()
 
     # --------------------------------------------------
@@ -184,3 +229,41 @@ class EmotionalState:
 
     def get(self, key: str) -> float | None:
         return self.state.get(key)
+    
+    def _apply_time_based_recovery(self):
+        """
+        Slowly returns emotions toward character-specific baselines
+        based on time elapsed since last save.
+        """
+
+        if not self.last_saved:
+            return
+
+        try:
+            last = datetime.fromisoformat(self.last_saved)
+            now = datetime.now()
+
+            hours_elapsed = (now - last).total_seconds() / 3600
+
+            if hours_elapsed <= 0:
+                return
+
+            # pull baselines from character JSON (inject this later)
+            baselines = getattr(self, "baselines", self.DEFAULTS)
+
+            # recovery strength scales with time, but caps out
+            recovery_rate = min(0.25, hours_elapsed * 0.02)
+
+            for key in self.state:
+                baseline = baselines.get(key, self.DEFAULTS.get(key, 0.5))
+
+                current = self.state[key]
+
+                # “spring toward baseline”
+                self.state[key] = current + (baseline - current) * recovery_rate
+
+                # clamp immediately
+                self.state[key] = max(0.0, min(1.0, self.state[key]))
+
+        except Exception as e:
+            print(f"[Emotion RECOVERY ERROR] {e}")
