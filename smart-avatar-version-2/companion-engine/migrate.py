@@ -140,7 +140,7 @@ def migrate_emotional_states():
         return 0
 
     count = 0
-    from engine.emotional_state import EmotionalState
+    from emotion.emotional_state import EmotionalState
 
     for char_name in sorted(os.listdir(chars_dir)):
         json_path = os.path.join(

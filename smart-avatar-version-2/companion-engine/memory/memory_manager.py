@@ -4,28 +4,20 @@ from memory.episodic_memory import EpisodicMemory
 from memory.recent_context import RecentContext
 from memory.life_events import LifeEvents
 
-
 class MemoryManager:
 
     def __init__(self):
 
         self.user_profile = UserProfile()
 
-        self.project_manager = (
-            ProjectManager()
-        )
+        self.project_manager = ProjectManager()
 
-        self.episodic_memory = (
-            EpisodicMemory()
-        )
+        self.episodic_memory = EpisodicMemory()
 
-        self.life_events = (
-            LifeEvents()
-        )
+        self.life_events = LifeEvents()
 
-        self.recent_context = (
-            RecentContext()
-        )
+        self.recent_context = RecentContext()
+
 
     # --------------------------------------------------
     # User Profile Memory

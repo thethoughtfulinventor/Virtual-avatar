@@ -1,13 +1,13 @@
 import os
 
-from engine.state_manager import StateManager
-from engine.event_bus import EventBus
-from engine.service_manager import ServiceManager
-from engine.plugin_manager import PluginManager
-from engine.character_loader import CharacterLoader
-from engine.character_roster import CharacterRoster
-from engine.brain import Brain
-from engine.cuda_manager import CudaManager       # Phase 8 prep
+from core.state_manager import StateManager
+from core.event_bus import EventBus
+from core.service_manager import ServiceManager
+from core.plugin_manager import PluginManager
+from characters.character_loader import CharacterLoader
+from characters.character_roster import CharacterRoster
+from conversation.brain import Brain
+from core.cuda_manager import CudaManager       # Phase 8 prep
 
 from memory.memory_manager import MemoryManager
 

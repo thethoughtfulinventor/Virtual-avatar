@@ -4,15 +4,19 @@ COMPANION ENGINE V2 - KNOWN ISSUES
 
 MEMORY ISSUES
 -------------
-- life events sometimes gets random data saved to it (things that would probably be better off in user data)
+- user_profile search could use some optimization work
+- emotion info get writen to the user data .db (by the llm not the actual process)
+- life events is storing non-important data like character switches (implimented by the llm no the process)
 
 EMOTION MANAGER
 ---------------
 
 CHARACTER SYSTEM
 ----------------
-- Character switching leaks context between AIs (meaning that the ai will answer all previous asked questions in recent memory when it switched characters)
-- Pyrus gets stuck in loops easily while Aiya does not
+
+PROGRAM LAUNCHING
+----------------
+- current system is far to strict( ex: open risk of rain 2 please results in cannot find the program "risk of rain 2 please, or i want to play risk of rain 2 results in a web search for the relese date of the game)
 
 FILE SYSTEM
 -----------
@@ -31,20 +35,27 @@ FILE AGENT
 
 TERMINAL
 --------
+
 PERFORMANCE
 -----------
 - Processing speed needs improvement.
 - General optimization needed.
 
+ARCHITECTURE
+------------
+- Brain.py is becoming too large.
+- Brain is taking ownership of too many systems.
+- rewrite files to be more optimized (remove redundancies, if there is a easier/faster way to run a process, etc)
+
 CURRENT PRIORITIES
 ------------------
-1. Fix memory corruption.
-2. Fix user data saving.
-3. Fix character context contamination.
-4. Improve file system reliability.
-5. Improve performance.
+1. Improve file system reliability.
+2. Improve performance.
+    - (part of prefomance improvment) improve memory retreval
+3. fix application launching
 
 LOW PRIORITY
 ------------
 - Investigate Headroom by chopratejas for context and token optimization.
 - Make it so if i ask for a web browser to be opened to a specific site it will 
+- maybe make it so if it is late (for a person) they will recomend the user go to bed (regaurdless of which personlaity it is)

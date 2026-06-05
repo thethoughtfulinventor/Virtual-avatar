@@ -34,13 +34,16 @@ class RecentContext:
                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
                 role      TEXT    NOT NULL,
                 content   TEXT    NOT NULL,
-                character TEXT,
+                character TEXT    NOT NULL,
                 ts        TEXT    NOT NULL
             )
         """)
         self._db.commit()
 
     def add(self, role, content, character=None):
+
+        if role == "user":
+            character = "User"
 
         self._db.execute(
             "INSERT INTO context "
