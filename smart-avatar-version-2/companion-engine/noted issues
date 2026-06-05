@@ -5,6 +5,7 @@ COMPANION ENGINE V2 - KNOWN ISSUES
 MEMORY ISSUES
 -------------
 - user_profile.db sometimes gets emotion data writen to it
+- life events sometimes gets random data saved to it (things that would probably be better off in user data)
 
 EMOTION MANAGER
 ---------------

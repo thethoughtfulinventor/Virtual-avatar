@@ -1,64 +1,57 @@
-import subprocess
+import configparser
+import os
 import shutil
+import subprocess
+from pathlib import Path
+
 from tools.base_tool import BaseTool
 
-# Ordered by likelihood of being installed.
-# Covers KDE, GNOME, XFCE, and standalone emulators.
 _TERMINAL_CANDIDATES = [
     "konsole",
     "gnome-terminal",
     "xfce4-terminal",
-    "xterm",
-    "alacritty",
     "kitty",
+    "alacritty",
     "tilix",
     "terminator",
-    "lxterminal",
-    "urxvt",
-    "rxvt",
-    "ptyxis",
-    "kgx",           # GNOME Console (newer GNOME)
     "mate-terminal",
-    "x-terminal-emulator",  # Debian/Ubuntu generic wrapper
+    "kgx",
+    "ptyxis",
+    "x-terminal-emulator",
+    "xterm",
 ]
 
-_ALIASES: dict[str, str] = {
-    "browser":      "firefox",
-    "firefox":      "firefox",
-    "chrome":       "google-chrome",
-    "chromium":     "chromium-browser",
-    "files":        "dolphin",
+_ALIASES = {
+    "browser": "firefox",
+    "web browser": "firefox",
+    "chrome": "google-chrome",
+    "files": "dolphin",
     "file manager": "dolphin",
-    "dolphin":      "dolphin",
-    "nautilus":     "nautilus",
-    "thunar":       "thunar",
-    "editor":       "kate",
-    "text editor":  "kate",
-    "kate":         "kate",
-    "gedit":        "gedit",
-    "vscode":       "code",
-    "vs code":      "code",
-    "code":         "code",
-    "steam":        "steam",
-    "discord":      "discord",
-    "spotify":      "spotify",
+    "editor": "kate",
+    "text editor": "kate",
+    "vs code": "code",
 }
 
-# Terminal aliases
-_TERMINAL_ALIASES = frozenset({
-    "terminal", "term", "console", "shell", "bash", "zsh",
-})
+_TERMINAL_ALIASES = {
+    "a terminal",
+    "terminal",
+    "console",
+    "shell",
+    "bash",
+    "zsh",
+}
 
 
-def _find_terminal() -> str | None:
-    """
-    Returns the first available terminal emulator found
-    in PATH, or None if none are installed.
+def _safe_launch(command):
+    subprocess.Popen(
+        command,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
 
-    FIX: added 'x-terminal-emulator' (Debian/Ubuntu) and
-    'mate-terminal' to the candidate list; these were
-    missing, causing detection failures on common distros.
-    """
+
+def _find_terminal():
     for term in _TERMINAL_CANDIDATES:
         if shutil.which(term):
             return term
@@ -66,73 +59,310 @@ def _find_terminal() -> str | None:
 
 
 class AppLaunchTool(BaseTool):
-    """
-    Launches a desktop application by name.
-
-    FIX (v2):
-    - Terminal detection now uses _find_terminal() correctly
-      and reports which candidates were tried on failure.
-    - subprocess.Popen now receives a list instead of a
-      shell=True string, which is safer and avoids the
-      shell layer misinterpreting application names with
-      spaces or special chars.
-    - Added 'mate-terminal', 'thunar', 'gedit', 'discord',
-      'spotify' to the alias table.
-    """
 
     name = "app_launch"
+
     description = (
-        "Launches a desktop application by name. "
-        "Use when the user asks to open or start "
-        "an app. "
-        "Args: app (str) — app name or command."
+        "Launch desktop applications using desktop entries, "
+        "Flatpak, Snap, PATH binaries, and aliases."
     )
 
-    def run(self, args: dict, context: dict) -> str:
+    def __init__(self):
+        self.desktop_entries = self._build_desktop_cache()
+        self.flatpak_apps = self._build_flatpak_cache()
+
+    # --------------------------------------------------
+    # Desktop Entry Discovery
+    # --------------------------------------------------
+
+    def _desktop_dirs(self):
+
+        return [
+            Path(
+                os.environ.get(
+                    "XDG_DATA_HOME",
+                    str(Path.home() / ".local/share"),
+                )
+            )
+            / "applications",
+
+            Path("/usr/share/applications"),
+
+            Path("/usr/local/share/applications"),
+
+            Path(
+                "/var/lib/flatpak/exports/share/applications"
+            ),
+
+            Path.home()
+            / ".local/share/flatpak/exports/share/applications",
+
+            Path(
+                "/var/lib/snapd/desktop/applications"
+            ),
+        ]
+
+    def _build_desktop_cache(self):
+
+        cache = {}
+
+        for directory in self._desktop_dirs():
+
+            if not directory.exists():
+                continue
+
+            for desktop_file in directory.rglob(
+                "*.desktop"
+            ):
+
+                try:
+
+                    parser = configparser.ConfigParser(
+                        interpolation=None
+                    )
+
+                    parser.read(
+                        desktop_file,
+                        encoding="utf-8"
+                    )
+
+                    if "Desktop Entry" not in parser:
+                        continue
+
+                    section = parser["Desktop Entry"]
+
+                    names = [
+                        desktop_file.stem,
+                        section.get("Name", ""),
+                        section.get(
+                            "GenericName",
+                            ""
+                        ),
+                    ]
+
+                    for name in names:
+
+                        name = (
+                            name.lower().strip()
+                        )
+
+                        if not name:
+                            continue
+
+                        cache[name] = desktop_file
+
+                except Exception:
+                    continue
+
+        return cache
+
+    # --------------------------------------------------
+    # Flatpak Discovery
+    # --------------------------------------------------
+
+    def _build_flatpak_cache(self):
+
+        cache = {}
+
+        if not shutil.which("flatpak"):
+            return cache
+
+        try:
+
+            result = subprocess.run(
+                [
+                    "flatpak",
+                    "list",
+                    "--app",
+                    "--columns=application,name",
+                ],
+                capture_output=True,
+                text=True,
+            )
+
+            for line in result.stdout.splitlines():
+
+                parts = line.split("\t")
+
+                if len(parts) < 2:
+                    continue
+
+                app_id = parts[0].strip()
+                name = parts[1].strip()
+
+                cache[name.lower()] = app_id
+                cache[app_id.lower()] = app_id
+
+        except Exception:
+            pass
+
+        return cache
+
+    # --------------------------------------------------
+    # Desktop Launch Methods
+    # --------------------------------------------------
+
+    def _launch_with_gtk(self, desktop_file):
+
+        if not shutil.which("gtk-launch"):
+            return False
+
+        try:
+
+            _safe_launch(
+                [
+                    "gtk-launch",
+                    desktop_file.stem,
+                ]
+            )
+
+            return True
+
+        except Exception:
+            return False
+
+    def _launch_with_gio(self, desktop_file):
+
+        if not shutil.which("gio"):
+            return False
+
+        try:
+
+            _safe_launch(
+                [
+                    "gio",
+                    "launch",
+                    str(desktop_file),
+                ]
+            )
+
+            return True
+
+        except Exception:
+            return False
+
+    # --------------------------------------------------
+    # Flatpak Launch
+    # --------------------------------------------------
+
+    def _launch_flatpak(self, app_name):
+
+        app_id = self.flatpak_apps.get(
+            app_name.lower()
+        )
+
+        if not app_id:
+            return False
+
+        try:
+
+            _safe_launch(
+                [
+                    "flatpak",
+                    "run",
+                    app_id,
+                ]
+            )
+
+            return True
+
+        except Exception:
+            return False
+
+    # --------------------------------------------------
+    # PATH Launch
+    # --------------------------------------------------
+
+    def _launch_binary(self, command):
+
+        executable = command.split()[0]
+
+        if not shutil.which(executable):
+            return False
+
+        try:
+
+            _safe_launch(command.split())
+            return True
+
+        except Exception:
+            return False
+
+    # --------------------------------------------------
+    # Main Entry
+    # --------------------------------------------------
+
+    def run(self, args, context):
+
         app = args.get("app", "").strip()
+
         if not app:
             return "No application specified."
 
         app_lower = app.lower()
 
-        # --- Resolve command ---
         if app_lower in _TERMINAL_ALIASES:
-            command = _find_terminal()
-            if not command:
-                tried = ", ".join(_TERMINAL_CANDIDATES)
+
+            terminal = _find_terminal()
+
+            if not terminal:
                 return (
-                    f"No terminal emulator found. "
-                    f"Tried: {tried}\n"
-                    f"Install one with: "
-                    f"sudo apt install xterm"
-                )
-        else:
-            command = _ALIASES.get(app_lower, app)
-            # Check only the base binary name
-            base_cmd = command.split()[0]
-            if not shutil.which(base_cmd):
-                return (
-                    f"Application not found: '{base_cmd}'. "
-                    f"Is it installed and on PATH?"
+                    "No terminal emulator found."
                 )
 
-        # --- Launch ---
-        # FIX: pass command as a list, not shell=True string.
-        # For multi-word commands (e.g. "google-chrome --incognito")
-        # we still split on whitespace.
-        cmd_parts = command.split() if isinstance(command, str) else [command]
+            _safe_launch([terminal])
 
-        try:
-            subprocess.Popen(
-                cmd_parts,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,  # detach from parent process
+            return (
+                f"Launched terminal: {terminal}"
             )
-            return f"Launched: {command}"
 
-        except FileNotFoundError:
-            return f"Could not find executable: '{cmd_parts[0]}'"
+        app_name = _ALIASES.get(
+            app_lower,
+            app,
+        )
 
-        except Exception as e:
-            return f"Failed to launch '{app}': {e}"
+        desktop_file = (
+            self.desktop_entries.get(
+                app_name.lower()
+            )
+        )
+
+        if desktop_file:
+
+            if self._launch_with_gtk(
+                desktop_file
+            ):
+                return (
+                    f"Launched {app_name}"
+                    " via gtk-launch"
+                )
+
+            if self._launch_with_gio(
+                desktop_file
+            ):
+                return (
+                    f"Launched {app_name}"
+                    " via gio"
+                )
+
+        if self._launch_flatpak(
+            app_name
+        ):
+            return (
+                f"Launched {app_name}"
+                " via Flatpak"
+            )
+
+        if self._launch_binary(
+            app_name
+        ):
+            return (
+                f"Launched {app_name}"
+                " via PATH"
+            )
+
+        return (
+            f"Application '{app}' "
+            "could not be located."
+        )
+
