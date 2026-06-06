@@ -13,6 +13,7 @@ EMOTION MANAGER
 
 CHARACTER SYSTEM
 ----------------
+- characters keep answering questions previously asked without being told to by the user (character bleed)
 
 PROGRAM LAUNCHING
 ----------------
@@ -50,10 +51,9 @@ ARCHITECTURE
 
 CURRENT PRIORITIES
 ------------------
-1. Improve file system reliability.
+1. prioritize fixing buggs asociated with anything up to phase 7 and getting everything in the system up to phase 7 (100% phase compleation)
 2. Improve performance.
     - (part of prefomance improvment) improve memory retreval
-    - reduce file sizes for optomization (keeping architecture and functionality)
 
 LOW PRIORITY
 ------------
