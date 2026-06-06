@@ -5,15 +5,26 @@ from conversation.response_processor import ResponseProcessor
 
 class CharacterRouter:
 
-    def __init__(self, roster, state_manager, prompt_builder, llm_client, tool_registry=None):
+    def __init__(
+        self,
+        roster,
+        state_manager,
+        prompt_builder,
+        llm_client,
+        tool_registry=None,
+        event_bus=None
+    ):
         self.roster = roster
         self.state_manager = state_manager
         self.prompt_builder = prompt_builder
         self.llm_client = llm_client
-        self.tool_registry = tool_registry # Ensure this is passed from Brain
-        
-        self.response_processor = ResponseProcessor(self.tool_registry)
-        
+        self.tool_registry = tool_registry
+        self.event_bus = event_bus
+
+        self.response_processor = ResponseProcessor(
+            self.tool_registry
+        )
+
         self.character = None
         self.character_manager = None
         self.emotional_manager = None
@@ -26,27 +37,40 @@ class CharacterRouter:
         print(f"[Router] Attempting switch to: '{name}'")
         canonical = self.roster.resolve_name(name)
         print(f"[Router] Resolved canonical name: {canonical}")
-        
+
         if not canonical:
             return None
 
         character_data = self.roster.get(canonical)
         print(f"[Router] Character data retrieved: {character_data is not None}")
-        
+
         if not character_data:
             return None
 
-        self.state_manager.set("active_character", character_data)
+        old_character = None
+
+        if self.character_manager:
+            old_character = self.character_manager.get_name()
+
         self.character = character_data
         self.character_manager = CharacterManager(character_data)
-        
+
         char_name = self.character_manager.get_name()
         print(f"[Router] Character Manager Name: {char_name}")
-        
+
         self.emotional_manager = EmotionalManager(char_name)
-        
+
+        self.state_manager.set("active_character", character_data)
+
+        if self.event_bus:
+            self.event_bus.emit(
+                "character_switched",
+                old_character=old_character,
+                new_character=char_name
+            )
+
         print(f"[Brain] Character switched to {canonical}")
-        return canonical   
+        return canonical 
     
     def _handle_switch(self, text: str, memory) -> dict:
         t_lower = text.lower().strip()

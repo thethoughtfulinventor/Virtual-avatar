@@ -43,6 +43,19 @@ class Brain:
     ):
         self.state_manager   = state_manager
         self.event_bus       = event_bus
+
+        def on_character_switched(**data):
+            print(
+                f"[EVENT] Character switched: "
+                f"{data['old_character']} -> "
+                f"{data['new_character']}"
+            )
+
+        event_bus.subscribe(
+            "character_switched",
+            on_character_switched
+        )
+
         self.service_manager = service_manager
         self.roster          = roster
 
@@ -53,8 +66,12 @@ class Brain:
 
         self.memory_retriever = MemoryRetriever(memory)
 
-        self.character = state_manager.get("active_character")
-        self.character_manager = CharacterManager(self.character)
+        character = state_manager.get("active_character")
+
+        if not character:
+            raise ValueError("No active character set in StateManager")
+
+        self.character_manager = CharacterManager(character)
 
         self.emotional_manager = EmotionalManager(
             self.character_manager.get_name()
@@ -73,7 +90,8 @@ class Brain:
             state_manager=state_manager,
             prompt_builder=self.prompt_builder,
             llm_client=self.llm_client,
-            tool_registry=self.tool_registry
+            tool_registry=self.tool_registry,
+            event_bus=self.event_bus
         )
 
 
@@ -81,6 +99,11 @@ class Brain:
             self.llm_client,
             roster,
             self.tool_registry,
+        )
+
+        self.event_bus.subscribe(
+            "state_changed",
+            self.on_state_changed
         )
 
         print("Brain initialized")
@@ -95,10 +118,18 @@ class Brain:
 
         if intent == "switch_character":
             result = self.character_router._handle_switch(text, memory)
+
             if result.get("character_switched"):
-                self.character_manager = self.character_router.character_manager
-                self.emotional_manager = self.character_router.emotional_manager
-            return result   
+                canonical = result["new_character"]
+                character_data = self.roster.get(canonical)
+
+                # SINGLE SOURCE OF TRUTH
+                self.state_manager.set("active_character", character_data)
+
+                self.character_manager = CharacterManager(character_data)
+                self.emotional_manager = EmotionalManager(canonical)
+
+            return result  
 
         if intent in _SYSTEM_INTENTS:
             return {
@@ -285,3 +316,12 @@ class Brain:
 
         if summary:
             print(f"[Memory] Episode stored: {summary[:60]}...")
+
+    def on_state_changed(self, key, old_value, new_value):
+        if key == "active_character":
+            print(f"[STATE] Character updated via StateManager")
+
+            self.character_manager = CharacterManager(new_value)
+            self.emotional_manager = EmotionalManager(
+                self.character_manager.get_name()
+            )

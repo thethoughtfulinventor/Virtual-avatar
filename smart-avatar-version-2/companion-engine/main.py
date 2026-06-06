@@ -63,194 +63,145 @@ def select_character(available):
         )
 
 
-def on_engine_started(data):
+def on_engine_started(**kwargs):
     print("Startup event received")
 
 
-def on_user_input(text):
+def on_user_input(**kwargs):
+    text = kwargs.get("text")
+    if not text or not isinstance(text, str):
+        return
+
+    # ----------------------------
+    # Safety guards (important)
+    # ----------------------------
+    global service_manager, brain_instance
+
+    if service_manager is None or brain_instance is None:
+        print("[WARN] service_manager or brain_instance not ready")
+        return
 
     memory = service_manager.get("memory")
+    if memory is None:
+        print("[WARN] memory service not available")
+        return
 
-    result = brain_instance.process(text)
+    try:
+        result = brain_instance.process(text)
+    except Exception as e:
+        print(f"[Brain Error] {e}")
+        return
 
-    intent = result["intent"]
+    if not isinstance(result, dict):
+        print("[Brain Error] Invalid response format")
+        return
 
-    current_name = (
-        brain_instance.character_manager.get_name()
-    )
+    intent = result.get("intent", "unknown")
+    response = result.get("response", "")
+    switched = result.get("character_switched", False)
+    new_character = result.get("new_character")
+
+    current_name = "unknown"
+    if brain_instance.character_manager:
+        current_name = brain_instance.character_manager.get_name()
 
     print(f"[INTENT] {intent}")
 
-    if result.get("character_switched"):
-        print(
-            f"[System] Switched to: "
-            f"{result['new_character']}"
-        )
+    if switched:
+        print(f"[System] Switched to: {new_character}")
 
-    # System intents return an empty response string —
-    # only print when the LLM actually produced output
-    if result["response"]:
-        print(f"{current_name}: {result['response']}")
+    # Only print real LLM output
+    if response:
+        print(f"{current_name}: {response}")
+
+    # ----------------------------
+    # SYSTEM INTENT HANDLING
+    # ----------------------------
 
     if intent == "switch_character":
         return
 
     if intent == "memory_store":
-
         try:
-
             key_value = text.replace("remember ", "")
             key, value = key_value.split("=", 1)
-
-            memory.remember(
-                key.strip(),
-                value.strip()
-            )
-
+            memory.remember(key.strip(), value.strip())
             print(f"Stored: {key.strip()}")
-
-        except ValueError:
+        except Exception:
             print("Usage: remember key=value")
-
         return
 
     if intent == "memory_recall":
-
         key = text.replace("recall ", "").strip()
-        value = memory.recall(key)
-        print(f"Memory: {value}")
-
+        print(f"Memory: {memory.recall(key)}")
         return
 
     if intent == "project_create":
-
-        project_name = text.replace(
-            "create project ", ""
-        ).strip()
-
-        memory.create_project(project_name)
-        print(f"Created project: {project_name}")
-
+        name = text.replace("create project ", "").strip()
+        memory.create_project(name)
+        print(f"Created project: {name}")
         return
 
     if intent == "project_lookup":
-
-        project_name = text.replace(
-            "project ", ""
-        ).strip()
-
-        project = memory.get_project(project_name)
-
-        if project:
-            print(project)
-        else:
-            print("Project not found")
-
+        name = text.replace("project ", "").strip()
+        project = memory.get_project(name)
+        print(project if project else "Project not found")
         return
 
     if intent == "projects_list":
-
         projects = memory.list_projects()
-
-        if projects:
-            print(projects)
-        else:
-            print("No projects found")
-
+        print(projects if projects else "No projects found")
         return
 
     if intent == "episode_create":
-
         summary = text.replace("episode ", "").strip()
         memory.add_episode(summary)
         print("Episode stored.")
-
         return
 
     if intent == "episode_list":
-
-        episodes = memory.get_recent_episodes()
-
-        for episode in episodes:
-            print(
-                f"{episode['timestamp']} "
-                f"- {episode['summary']}"
-            )
-
+        for ep in memory.get_recent_episodes():
+            print(f"{ep['timestamp']} - {ep['summary']}")
         return
 
     if intent == "context_view":
-
-        entries = memory.get_recent_context()
-
-        for entry in entries:
-            print(
-                f"[{entry['role']}] "
-                f"{entry['content']}"
-            )
-
+        for entry in memory.get_recent_context():
+            print(f"[{entry['role']}] {entry['content']}")
         return
 
     if intent == "context_clear":
-
         memory.recent_context.clear()
         print("Context cleared.")
-
         return
 
     if intent == "episode_clear":
-
-        # clear() is the proper SQL-backed method;
-        # avoids the old direct .episodes = [] hack
         memory.episodic_memory.clear()
         print("Episodic memory cleared.")
-
         return
 
     if intent == "life_event_create":
-
-        description = text.replace(
-            "life event ", ""
-        ).strip()
-
-        memory.add_life_event(description)
+        desc = text.replace("life event ", "").strip()
+        memory.add_life_event(desc)
         print("Life event stored.")
-
         return
 
     if intent == "life_events_list":
-
-        events = memory.get_life_events()
-
-        for event in events:
-            print(
-                f"{event['timestamp']} "
-                f"- {event['description']}"
-            )
-
+        for event in memory.get_life_events():
+            print(f"{event['timestamp']} - {event['description']}")
         return
 
     if intent == "state_view":
-
-        state = (
-            brain_instance
-            .emotional_manager
-            .get_all()
-        )
-
-        dominant = (
-            brain_instance
-            .emotional_manager
-            .get_dominant()
-        )
+        state = brain_instance.emotional_manager.get_all()
+        dominant = brain_instance.emotional_manager.get_dominant()
 
         print(f"Dominant state: {dominant}")
-
-        for key, value in state.items():
-            print(f"  {key}: {value:.2f}")
-
+        for k, v in state.items():
+            print(f"  {k}: {v:.2f}")
         return
 
+    # ----------------------------
+    # fallback debug output
+    # ----------------------------
     print(f"[EVENT] user_input: {text}")
 
 
@@ -269,8 +220,11 @@ def main():
     cuda_manager.print_status()
     print("-" * 40)
 
-    state_manager = StateManager()
+    state_manager = StateManager()   # no event_bus yet
     event_bus = EventBus()
+
+    # NOW inject event bus into state manager if you want it
+    state_manager.event_bus = event_bus
 
     global service_manager
     service_manager = ServiceManager()
@@ -339,7 +293,10 @@ def main():
 
     print("Core systems initialized")
 
-    event_bus.emit("engine_started")
+    event_bus.emit(
+        "engine_started",
+        timestamp="startup"
+    )
 
     print("=" * 40)
     print("Commands:")
@@ -373,7 +330,10 @@ def main():
         if not command.strip():
             continue
 
-        event_bus.emit("user_input", command)
+        event_bus.emit(
+            "user_input",
+            text=command
+        )
         print()
 
     print("\nShutting down... Goodbye!")

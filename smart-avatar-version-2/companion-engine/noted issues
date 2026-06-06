@@ -59,3 +59,4 @@ LOW PRIORITY
 ------------
 - Investigate Headroom by chopratejas for context and token optimization.
 - maybe make it so if it is late (for a person) they will recomend the user go to bed (regaurdless of which personlaity it is)
+- ai when asked how long since last mesage cannot answer that
