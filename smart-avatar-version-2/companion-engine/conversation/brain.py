@@ -165,9 +165,27 @@ class Brain:
         )
 
         if retrieved_context:
-            system_prompt += (
-                f"\n\nRETRIEVED CONTEXT:\n{retrieved_context}"
-            )
+
+            system_prompt += f"""
+
+        TOOL EXECUTION RESULTS
+
+        {retrieved_context}
+
+        IMPORTANT:
+        The tool execution has ALREADY happened.
+
+        If a tool result indicates success:
+        - Do NOT explain how to perform the action.
+        - Do NOT ask whether the user has done it.
+        - Do NOT provide instructions for doing it.
+        - Acknowledge that it was completed.
+
+        If a tool result indicates failure:
+        - Explain the failure naturally.
+
+        Treat successful tool results as facts.
+        """
 
         recent = memory.get_recent_context(ModelConfig.MAX_CONTEXT)
         messages = self.prompt_builder.format_context(

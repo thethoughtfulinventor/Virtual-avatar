@@ -9,11 +9,13 @@ from skills.file_skill import (
 )
 from skills.terminal_skill import TerminalRunTool
 from skills.app_launcher_skill import AppLaunchTool
+from skills.browser_skill import BrowserTool
 from skills.system_skill import SystemStatsTool
 
 
 SKILL_CLASSES = [
     WebSearchTool,
+    BrowserTool,
     FileListTool,
     FileReadTool,
     FileWriteTool,

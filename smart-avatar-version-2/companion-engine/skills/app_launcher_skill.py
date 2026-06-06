@@ -3,6 +3,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
+from difflib import get_close_matches
 
 from tools.base_tool import BaseTool
 
@@ -247,9 +248,25 @@ class AppLaunchTool(BaseTool):
 
     def _launch_flatpak(self, app_name):
 
+        app_name = app_name.lower()
+
         app_id = self.flatpak_apps.get(
-            app_name.lower()
+            app_name
         )
+
+        if not app_id:
+
+            matches = get_close_matches(
+                app_name,
+                self.flatpak_apps.keys(),
+                n=1,
+                cutoff=0.6
+            )
+
+            if matches:
+                app_id = self.flatpak_apps[
+                    matches[0]
+                ]
 
         if not app_id:
             return False
@@ -313,7 +330,7 @@ class AppLaunchTool(BaseTool):
             _safe_launch([terminal])
 
             return (
-                f"Launched terminal: {terminal}"
+                f"SUCCESS: terminal: {terminal}"
             )
 
         app_name = _ALIASES.get(
@@ -322,8 +339,8 @@ class AppLaunchTool(BaseTool):
         )
 
         desktop_file = (
-            self.desktop_entries.get(
-                app_name.lower()
+            self._find_desktop_match(
+                app_name
             )
         )
 
@@ -333,7 +350,7 @@ class AppLaunchTool(BaseTool):
                 desktop_file
             ):
                 return (
-                    f"Launched {app_name}"
+                    f"SUCCESS: Application {app_name}"
                     " via gtk-launch"
                 )
 
@@ -341,7 +358,7 @@ class AppLaunchTool(BaseTool):
                 desktop_file
             ):
                 return (
-                    f"Launched {app_name}"
+                    f"SUCCESS: Application {app_name}"
                     " via gio"
                 )
 
@@ -349,7 +366,7 @@ class AppLaunchTool(BaseTool):
             app_name
         ):
             return (
-                f"Launched {app_name}"
+                f"SUCCESS: Application {app_name}"
                 " via Flatpak"
             )
 
@@ -357,12 +374,43 @@ class AppLaunchTool(BaseTool):
             app_name
         ):
             return (
-                f"Launched {app_name}"
+                f"SUCCESS: Application {app_name}"
                 " via PATH"
             )
 
         return (
-            f"Application '{app}' "
+            f"SUCCESS: Application '{app}' "
             "could not be located."
         )
+    
+    def _find_desktop_match(self, app_name):
+
+        app_name = app_name.lower()
+
+        match = self.desktop_entries.get(
+            app_name
+        )
+
+        if match:
+            return match
+
+        matches = get_close_matches(
+            app_name,
+            self.desktop_entries.keys(),
+            n=1,
+            cutoff=0.6
+        )
+
+        if matches:
+
+            print(
+                "[AppLaunch] Fuzzy match:"
+                f" {app_name} -> {matches[0]}"
+            )
+
+            return self.desktop_entries[
+                matches[0]
+            ]
+
+        return None
 

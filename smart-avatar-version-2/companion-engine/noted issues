@@ -16,7 +16,8 @@ CHARACTER SYSTEM
 
 PROGRAM LAUNCHING
 ----------------
-- current system is far to strict( ex: open risk of rain 2 please results in cannot find the program "risk of rain 2 please, or i want to play risk of rain 2 results in a web search for the relese date of the game)
+- when i ask it to open a websearch for cats it says it cant
+- when i say something like "i want to watch funny cat videos" it defaults to a internal websearch then asks which i want it to open, then when i select wich one it fails to open the browser
 
 FILE SYSTEM
 -----------
@@ -52,10 +53,9 @@ CURRENT PRIORITIES
 1. Improve file system reliability.
 2. Improve performance.
     - (part of prefomance improvment) improve memory retreval
-3. fix application launching
+    - reduce file sizes for optomization (keeping architecture and functionality)
 
 LOW PRIORITY
 ------------
 - Investigate Headroom by chopratejas for context and token optimization.
-- Make it so if i ask for a web browser to be opened to a specific site it will 
 - maybe make it so if it is late (for a person) they will recomend the user go to bed (regaurdless of which personlaity it is)

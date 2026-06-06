@@ -23,12 +23,12 @@ class WebSearchTool(BaseTool):
 
     name = "web_search"
     description = (
-        "Searches the web for current information. "
-        "Use for news, weather, recent events, "
-        "prices, sports, or any real-time data. "
-        "Args: query (str) — the search query."
+        "Retrieves information from the internet "
+        "for answering questions. "
+        "Used for facts, news, weather, research, "
+        "sports, prices, and current events. "
+        "Does not open browser windows."
     )
-
     def run(self, args, context):
 
         if not _DDGS_AVAILABLE:

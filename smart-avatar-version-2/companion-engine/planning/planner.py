@@ -1,6 +1,16 @@
 import json
 import re
 
+KNOWN_WEBSITES = {
+    "youtube": "youtube.com",
+    "google": "google.com",
+    "reddit": "reddit.com",
+    "github": "github.com",
+    "wikipedia": "wikipedia.org",
+    "gmail": "mail.google.com",
+    "chatgpt": "chatgpt.com",
+}
+
 class Planner:
 
     def __init__(
@@ -83,32 +93,66 @@ class Planner:
     text,
     current_character
     ):
+        
+        query = self._extract_browser_search(text)
 
-        lower = text.lower()
-
-        launch = re.match(
-            r"^(open|launch|start|run)\s+(.+)$",
-            text,
-            re.IGNORECASE
-        )
-
-        if launch:
-
-            app = launch.group(2).strip()
+        if query:
 
             return {
                 "best_character": None,
                 "reason": "",
-                "response_strategy":
-                    "direct",
+                "response_strategy": "direct",
+                "tools_needed": [
+                    {
+                        "tool": "browser",
+                        "args": {
+                            "action": "search",
+                            "query": query
+                        },
+                        "description": f"Search for {query}"
+                    }
+                ]
+            }
+
+        lower = text.lower()
+
+        website = self._extract_website_target(text)
+
+        if website:
+
+            return {
+                "best_character": None,
+                "reason": "",
+                "response_strategy": "direct",
+                "tools_needed": [
+                    {
+                        "tool": "browser",
+                        "args": {
+                            "action": "open",
+                            "url": website
+                        },
+                        "description": f"Open {website}"
+                    }
+                ]
+            }
+
+        app = self._extract_launch_target(text)
+
+        if app:
+
+            app = self._clean_app_name(app)
+
+            return {
+                "best_character": None,
+                "reason": "",
+                "response_strategy": "direct",
                 "tools_needed": [
                     {
                         "tool": "app_launch",
                         "args": {
                             "app": app
                         },
-                        "description":
-                            f"Launch {app}"
+                        "description": f"Launch {app}"
                     }
                 ]
             }
@@ -229,6 +273,24 @@ class Planner:
 
                 lines.append(
                     "Args:"
+                )
+
+                lines.append(
+                    "  query (string)"
+                )
+            
+            elif name == "browser":
+
+                lines.append(
+                    "Args:"
+                )
+
+                lines.append(
+                    "  action (string)"
+                )
+
+                lines.append(
+                    "  url (string)"
                 )
 
                 lines.append(
@@ -377,3 +439,91 @@ class Planner:
             f"{plan['response_strategy']}, "
             f"tools={tools}"
         )
+
+    def _extract_launch_target(self, text):
+        patterns = [
+
+            r"^(?:open|launch|start|run)\s+(.+)$",
+
+            r"can you (?:open|launch|start|run)\s+(.+)$",
+
+            r"please (?:open|launch|start|run)\s+(.+)$",
+
+            r"i want to play\s+(.+)$",
+
+            r"i'd like to play\s+(.+)$",
+
+        ]
+
+        for pattern in patterns:
+
+            match = re.match(
+                pattern,
+                text,
+                re.IGNORECASE
+            )
+
+            if match:
+                return match.group(1).strip()
+
+        return None
+    def _clean_app_name(self, app):
+
+        app = app.lower()
+
+        for filler in [
+            "for me",
+            "please",
+            "thanks",
+            "thank you"
+        ]:
+
+            app = app.replace(
+                filler,
+                ""
+            )
+
+        app = app.strip(" ?.,!")
+
+        return app.strip()
+    
+    def _extract_website_target(self, text):
+
+        lower = text.lower()
+
+        for name, url in KNOWN_WEBSITES.items():
+
+            patterns = [
+                f"open {name}",
+                f"launch {name}",
+                f"start {name}",
+                f"run {name}",
+                f"can you open {name}",
+                f"please open {name}",
+            ]
+
+            if any(p in lower for p in patterns):
+                return url
+
+        return None
+    
+    def _extract_browser_search(self, text):
+
+        lower = text.lower().strip()
+
+        if lower.startswith("search for "):
+            return text[11:].strip()
+
+        if lower.startswith("google "):
+            return text[7:].strip()
+
+        if lower.startswith("websearch "):
+            return text[10:].strip()
+
+        if lower.startswith("open a websearch about "):
+            return text[22:].strip()
+
+        if lower.startswith("search about "):
+            return text[13:].strip()
+
+        return None
